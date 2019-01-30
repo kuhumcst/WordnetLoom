@@ -6,8 +6,6 @@ import edu.uci.ics.jung.graph.DirectedSparseGraph;
 import pl.edu.pwr.wordnetloom.common.model.NodeDirection;
 import pl.edu.pwr.wordnetloom.common.repository.GenericRepository;
 import pl.edu.pwr.wordnetloom.relationtype.model.RelationType;
-import pl.edu.pwr.wordnetloom.relationtype.repository.RelationTypeRepository;
-import pl.edu.pwr.wordnetloom.sense.model.Sense;
 import pl.edu.pwr.wordnetloom.synset.model.Synset;
 import pl.edu.pwr.wordnetloom.synsetrelation.model.SynsetRelation;
 
@@ -15,18 +13,13 @@ import javax.ejb.Stateless;
 import javax.inject.Inject;
 import javax.persistence.EntityManager;
 import javax.persistence.Query;
-import javax.persistence.criteria.*;
 import java.util.*;
-import java.util.Map.Entry;
 
 @Stateless
 public class SynsetRelationRepository extends GenericRepository<SynsetRelation> {
 
     @Inject
     EntityManager em;
-
-    @Inject
-    RelationTypeRepository relationTypeRepository;
 
     public boolean delete(Synset parent, Synset child, RelationType relationType) {
         Query query = getEntityManager().createQuery("DELETE FROM SynsetRelation s WHERE s.parent.id = :parent AND s.child.id = :child AND s.relationType.id = :relationType", SynsetRelation.class);
@@ -44,7 +37,6 @@ public class SynsetRelationRepository extends GenericRepository<SynsetRelation> 
     }
 
     public void delete(SynsetRelation relation){
-//        getEntityManager().remove(relation);
         em.remove(em.contains(relation) ? relation : em.merge(relation));
     }
 
@@ -134,64 +126,27 @@ public class SynsetRelationRepository extends GenericRepository<SynsetRelation> 
         return relations.get(0);
     }
 
-    public Long findRelationCountBySynset(Synset synset) {
-        return getEntityManager().createNamedQuery("SynsetRelation.countSynsetRelations", Long.class)
-                .setParameter("synsetID", synset.getId())
-                .getSingleResult();
-    }
+    public List<Synset> findTopPathInSynsets(Synset synset, Long rtype) {
+        ArrayList<Synset> path = new ArrayList<>();
 
-    /**
-     * Returns a path to the top synset in relation visualisation.
-     *
-     * @param synset start synset
-     * @param rtype  relation type
-     * @return path to the top synset
-     */
-    // TODO: refactoring is needed
-    // FIXME: move to service, logic overload!
-    public List<Long> findTopPath(Synset synset, Long rtype) {
-        ArrayList<Long> path = new ArrayList<>();
-
-        DirectedGraph<Long, SynsetRelation> g = new DirectedSparseGraph<>();
-
-        g.addVertex(synset.getId());
-        Deque<Long> stack = new ArrayDeque<>();
-        stack.push(synset.getId());
-        while (!stack.isEmpty()) {
-            Long item = stack.pop();
-
-            List<SynsetRelation> rels = getEntityManager().createNamedQuery("SynsetRelation.dbGetTopPath", SynsetRelation.class)
-                    .setParameter("id_s", item)
-                    .setParameter("id_r", rtype)
-                    .getResultList();
-
-            for (SynsetRelation rel : rels) {
-                stack.push(rel.getChild().getId());
-                g.addEdge(rel, item, rel.getChild().getId());
-            }
-        }
-
-        DijkstraShortestPath<Long, SynsetRelation> dsp
-                = new DijkstraShortestPath<>(g);
-
+        DirectedGraph<Long, SynsetRelation> g = getRelationDirectedGraph(synset, rtype);
+        DijkstraShortestPath<Long, SynsetRelation> dsp = new DijkstraShortestPath<>(g);
         Map<Long, Number> map = dsp.getDistanceMap(synset.getId());
-        Long last = new Long(-1);
-        for (Entry<Long, Number> p : map.entrySet()) {
-            last = p.getKey();
-        }
-
+        Long last = getLastElement(map);
         if (last != -1) {
             List<SynsetRelation> p = dsp.getPath(synset.getId(), last);
             for (SynsetRelation r : p) {
-                path.add(r.getChild().getId());
+                path.add(r.getChild());
             }
         }
         return path;
     }
 
-    public List<Synset> findTopPathInSynsets(Synset synset, Long rtype) {
-        ArrayList<Synset> path = new ArrayList<>();
+    private Long getLastElement(Map<Long, Number> map) {
+        return map.entrySet().stream().skip(map.size()-1).findFirst().get().getKey();
+    }
 
+    private DirectedGraph<Long, SynsetRelation> getRelationDirectedGraph(Synset synset, Long rtype) {
         DirectedGraph<Long, SynsetRelation> g = new DirectedSparseGraph<>();
 
         g.addVertex(synset.getId());
@@ -209,23 +164,7 @@ public class SynsetRelationRepository extends GenericRepository<SynsetRelation> 
                 }
             }
         }
-
-        DijkstraShortestPath<Long, SynsetRelation> dsp
-                = new DijkstraShortestPath<>(g);
-
-        Map<Long, Number> map = dsp.getDistanceMap(synset.getId());
-        Long last = new Long(-1);
-        for (Entry<Long, Number> p : map.entrySet()) {
-            last = p.getKey();
-        }
-
-        if (last != -1) {
-            List<SynsetRelation> p = dsp.getPath(synset.getId(), last);
-            for (SynsetRelation r : p) {
-                path.add(r.getParent());
-            }
-        }
-        return path;
+        return g;
     }
 
     private List<SynsetRelation> findSynsetRelation(Long parentId, Long relationTypeId) {
@@ -238,7 +177,6 @@ public class SynsetRelationRepository extends GenericRepository<SynsetRelation> 
     private List<SynsetRelation> getRelations(Synset synset, List<Long> lexicons, String joinColumn, String synsetIdColumn, NodeDirection[] directions) {
         Query query = getEntityManager().createQuery("FROM SynsetRelation sr LEFT JOIN FETCH sr." + joinColumn + " AS synset " +
                 "LEFT JOIN FETCH synset.senses AS sense " +
-                "LEFT JOIN FETCH synset.synsetAttributes AS attributes " +
                 "LEFT JOIN FETCH sense.domain " +
                 "LEFT JOIN FETCH sense.lexicon " +
                 "LEFT JOIN FETCH sense.partOfSpeech "+
@@ -252,55 +190,6 @@ public class SynsetRelationRepository extends GenericRepository<SynsetRelation> 
                 .setParameter("directions", Arrays.asList(directions))
                 .setParameter("lexicons", lexicons);
         return query.getResultList();
-    }
-
-    private List<SynsetRelation> fetchRelatedSynset(List<Long> relationsIds, List<Long> lexicons, String fetchColumn) {
-        CriteriaBuilder criteriaBuilder = em.getCriteriaBuilder();
-        CriteriaQuery<SynsetRelation> query = criteriaBuilder.createQuery(SynsetRelation.class);
-        Root<SynsetRelation> relationRoot = query.from(SynsetRelation.class);
-        Join<SynsetRelation, Synset> synsetJoin = relationRoot.join(fetchColumn);
-        Join<SynsetRelation, Sense> senseJoin = synsetJoin.join("senses");
-        Fetch<SynsetRelation, Synset> synsetFetch = relationRoot.fetch(fetchColumn, JoinType.LEFT);
-        Fetch<SynsetRelation, Sense> senseFetch = synsetFetch.fetch("senses", JoinType.LEFT);
-        senseFetch.fetch("domain", JoinType.LEFT);
-        senseFetch.fetch("lexicon", JoinType.LEFT);
-        senseFetch.fetch("partOfSpeech", JoinType.LEFT);
-
-        List<Predicate> predicates = new ArrayList<>();
-        Predicate idPredicate = relationRoot.get("id").in(relationsIds);
-        Predicate sensePredicate = criteriaBuilder.equal(senseJoin.get("synsetPosition"), 0);
-        predicates.add(idPredicate);
-        predicates.add(sensePredicate);
-        query.where(predicates.toArray(new Predicate[0]));
-
-        List<SynsetRelation> resultList = getEntityManager().createQuery(query).getResultList();
-
-        return resultList;
-    }
-
-    private List<Long> getRelationsIds(List<SynsetRelation> synsetList, int numRelationsOnDirection) {
-        final int NUM_DIRECTION = 4;
-        int[] directionCounter = new int[NUM_DIRECTION];
-        Arrays.fill(directionCounter, 0);
-
-        int filledDirectionsCounter = 0;
-
-        List<Long> resultList = new ArrayList<>();
-
-        for (SynsetRelation relation : synsetList) {
-            int direction = relation.getRelationType().getNodePosition().ordinal();
-            if (directionCounter[direction] != numRelationsOnDirection) {
-                resultList.add(relation.getId());
-                directionCounter[direction]++;
-                if (directionCounter[direction] == numRelationsOnDirection) {
-                    filledDirectionsCounter++;
-                }
-                if (filledDirectionsCounter == NUM_DIRECTION) {
-                    return resultList;
-                }
-            }
-        }
-        return resultList;
     }
 
     private List<SynsetRelation> findAllRelationBySynset(Synset synset, List<Long> lexicons, boolean synsetIsParent, NodeDirection[] directions) {
@@ -363,11 +252,10 @@ public class SynsetRelationRepository extends GenericRepository<SynsetRelation> 
      * @return wszystkie relację podanego synsetu
      */
     public List<SynsetRelation> findRelations(Synset synset) {
-        return getEntityManager().createQuery("SELECT sr.FROM SynsetRelation WHERE sr.parent.id =:id OR sr.child.id =:id", SynsetRelation.class)
+        return getEntityManager().createQuery("SELECT sr FROM SynsetRelation sr WHERE sr.parent.id =:id OR sr.child.id =:id", SynsetRelation.class)
                 .setParameter("id", synset.getId())
                 .getResultList();
     }
-
 
     @Override
     protected Class<SynsetRelation> getPersistentClass() {

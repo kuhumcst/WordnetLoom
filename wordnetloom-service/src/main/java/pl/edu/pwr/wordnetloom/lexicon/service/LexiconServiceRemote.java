@@ -7,14 +7,10 @@ public interface LexiconServiceRemote {
 
     Lexicon findById(Long id);
 
-    List<Lexicon> findAllByLexicon(List<Long> lexiconIds);
-
     List<Lexicon> findAll();
 
     List<Long> findAllLexiconIds();
 
     Lexicon add(Lexicon lexicon);
 
-    String testUser();
-    
 }

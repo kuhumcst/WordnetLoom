@@ -1,6 +1,9 @@
 package pl.edu.pwr.wordnetloom.sense.model;
 
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.NotAudited;
 import pl.edu.pwr.wordnetloom.common.model.GenericEntity;
+import pl.edu.pwr.wordnetloom.dictionary.model.Status;
 import pl.edu.pwr.wordnetloom.domain.model.Domain;
 import pl.edu.pwr.wordnetloom.lexicon.model.Lexicon;
 import pl.edu.pwr.wordnetloom.partofspeech.model.PartOfSpeech;
@@ -9,14 +12,11 @@ import pl.edu.pwr.wordnetloom.synset.model.Synset;
 import pl.edu.pwr.wordnetloom.word.model.Word;
 
 import javax.persistence.*;
-import javax.validation.Constraint;
-import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
+@Audited
 @Entity
 @Table(name = "sense")
 public class Sense extends GenericEntity {
@@ -46,14 +46,6 @@ public class Sense extends GenericEntity {
     @Column(name = "synset_position", columnDefinition = "int default 0")
     private Integer synsetPosition = 0;
 
-    @Valid
-    @NotNull
-    @OneToOne(mappedBy = "sense", cascade = CascadeType.ALL, fetch = FetchType.LAZY, optional = false)
-    private SenseAttributes senseAttributes;
-
-    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, mappedBy = "sense", orphanRemoval = true)
-    private List<SenseExample> examples;
-
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lexicon_id", referencedColumnName = "id", nullable = false)
@@ -65,13 +57,12 @@ public class Sense extends GenericEntity {
     @OneToMany(mappedBy = "parent", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private final Set<SenseRelation> outgoingRelations = new HashSet<>();
 
-    private Integer status = 0;
+    @NotAudited
+    @ManyToOne
+    @JoinColumn(name = "status_id", referencedColumnName = "id")
+    private Status status;
 
     public Sense() {
-        super();
-        senseAttributes = new SenseAttributes();
-        senseAttributes.setSense(this);
-        examples = new ArrayList<>();
     }
 
     public Sense(Sense sense) {
@@ -80,8 +71,6 @@ public class Sense extends GenericEntity {
         partOfSpeech = sense.partOfSpeech;
         variant = sense.variant;
         lexicon = sense.lexicon;
-        senseAttributes = new SenseAttributes(sense.senseAttributes);
-        sense.getExamples().forEach(i -> getExamples().add(i));
     }
 
     public Domain getDomain() {
@@ -132,14 +121,6 @@ public class Sense extends GenericEntity {
         this.synset = synset;
     }
 
-    public SenseAttributes getSenseAttributes() {
-        return senseAttributes;
-    }
-
-    public void setSenseAttributes(SenseAttributes senseAttributes) {
-        this.senseAttributes = senseAttributes;
-    }
-
     public Integer getSynsetPosition() {
         return synsetPosition;
     }
@@ -156,20 +137,12 @@ public class Sense extends GenericEntity {
         return outgoingRelations;
     }
 
-    public Integer getStatus() {
+    public Status getStatus() {
         return status;
     }
 
-    public void setStatus(Integer status) {
+    public void setStatus(Status status) {
         this.status = status;
-    }
-
-    public List<SenseExample> getExamples() {
-        return examples;
-    }
-
-    public void setExamples(List<SenseExample> examples) {
-        this.examples = examples;
     }
 
     @Override

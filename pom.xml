@@ -80,17 +80,6 @@
             </dependency>
             <dependency>
                 <groupId>pl.edu.pwr</groupId>
-                <artifactId>wordnetloom-client-fx</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>pl.edu.pwr</groupId>
-                <artifactId>wordnetloom-download</artifactId>
-                <version>${project.version}</version>
-                <type>war</type>
-            </dependency>
-            <dependency>
-                <groupId>pl.edu.pwr</groupId>
                 <artifactId>wordnetloom-service</artifactId>
                 <version>${project.version}</version>
                 <type>ejb-client</type>
@@ -133,5 +122,7 @@
         <module>wordnetloom-service</module>
         <module>wordnetloom-client</module>
         <module>wordnetloom-server</module>
+        <module>wordnetloom-client-updater</module>
+        <module>wordnetloom-download</module>
     </modules>
 </project>

@@ -17,6 +17,7 @@ or FITNESS FOR A PARTICULAR PURPOSE.
  */
 package pl.edu.pwr.wordnetloom.client.plugins.lexeditor.frames;
 
+import com.alee.laf.panel.WebPanel;
 import pl.edu.pwr.wordnetloom.client.systems.models.GenericListModel;
 import pl.edu.pwr.wordnetloom.client.systems.tooltips.SenseTooltipGenerator;
 import pl.edu.pwr.wordnetloom.client.systems.tooltips.ToolTipList;
@@ -38,18 +39,15 @@ abstract public class AbstractListFrame<T, G> extends
         DialogWindow implements ActionListener, ListSelectionListener,
         KeyListener, MouseListener {
 
-    private static final String STANDARD_VALUE_FILTER = "";
     public static final int WIDTH = 300, HEIGHT = 400;
-
+    private static final String STANDARD_VALUE_FILTER = "";
     private static final long serialVersionUID = 1L;
-
-    protected JTextField filterEdit;
     private final JList itemsList;
     private final MButton buttonChoose;
     private final MButton buttonSearch;
     private final MButton buttonCancel;
     private final MButton buttonNew;
-
+    protected JTextField filterEdit;
     protected GenericListModel<T> listModel = null;
     protected G filterObject = null;
 
@@ -75,8 +73,6 @@ abstract public class AbstractListFrame<T, G> extends
         buttonSearch = MButton.buildSearchButton(this)
                 .withKeyListener(this);
 
-//        itemsList = new ToolTipList(workbench, listModel,
-//                ToolTipGenerator.getGenerator());
         itemsList = new ToolTipList(workbench, listModel, new SenseTooltipGenerator()); //TODO zobaczyć, w jakich miejscach jest to używane i czy czegoś nie zepsuje
 
         itemsList.addListSelectionListener(this);
@@ -101,7 +97,7 @@ abstract public class AbstractListFrame<T, G> extends
                 .withEnabled(true);
 
         // panel dolny z przyciskami
-        JPanel buttonsPanel = new JPanel();
+        WebPanel buttonsPanel = new WebPanel();
         buttonsPanel.setLayout(new BoxLayout(buttonsPanel, BoxLayout.X_AXIS));
         buttonsPanel.add(buttonChoose);
         buttonsPanel.add(buttonCancel);
@@ -239,7 +235,7 @@ abstract public class AbstractListFrame<T, G> extends
         }
     }
 
-    protected void setMultSelect(boolean multiSelect) {
+    protected void setMultiSelect(boolean multiSelect) {
         if (multiSelect) {
             itemsList
                     .setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);

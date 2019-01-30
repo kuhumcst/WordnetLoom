@@ -1,6 +1,5 @@
 package pl.edu.pwr.wordnetloom.synsetrelation.service;
 
-import pl.edu.pwr.wordnetloom.common.dto.DataEntry;
 import pl.edu.pwr.wordnetloom.common.model.NodeDirection;
 import pl.edu.pwr.wordnetloom.relationtype.model.RelationType;
 import pl.edu.pwr.wordnetloom.synset.model.Synset;
@@ -34,7 +33,7 @@ public interface SynsetRelationServiceRemote {
 
     boolean checkRelationExists(Synset parent, Synset child, RelationType relation);
 
-    List<RelationType> findtRelationTypesBySynset(Synset synset);
+    List<RelationType> findRelationTypesBySynset(Synset synset);
 
     int deleteImproper();
 
@@ -42,12 +41,7 @@ public interface SynsetRelationServiceRemote {
 
     SynsetRelation findRelation(Synset parent, Synset child, RelationType relation);
 
-    Long findRelationCountBySynset(Synset synset);
-
-    List<Long> findTopPath(Synset synset, Long rtype);
-
     List<Synset> findTopPathInSynsets(Synset synset, Long rtype);
-//    List<DataEntry> findTopPathInSynsets(Synset synset, Long rtype);
 
     List<SynsetRelation> findRelationsWhereSynsetIsChild(Synset synset, List<Long> lexicons, NodeDirection[] directions);
 

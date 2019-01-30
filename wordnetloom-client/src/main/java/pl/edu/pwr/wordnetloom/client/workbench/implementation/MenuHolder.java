@@ -17,10 +17,13 @@ or FITNESS FOR A PARTICULAR PURPOSE.
  */
 package pl.edu.pwr.wordnetloom.client.workbench.implementation;
 
+import com.alee.laf.label.WebLabel;
 import com.alee.laf.menu.WebMenu;
 import com.alee.laf.menu.WebMenuBar;
 import pl.edu.pwr.wordnetloom.client.systems.ui.MMenuItem;
+import se.datadosen.component.RiverLayout;
 
+import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.util.Collection;
@@ -33,16 +36,19 @@ import java.util.Collection;
  */
 public class MenuHolder {
 
-    private static final String SHORTCUTS = "Shortcuts";
-
     private final WebMenuBar menuBar;
-    // private final WebMenu shortCutsMenu;
 
     public MenuHolder() {
+
         menuBar = new WebMenuBar();
-        //  shortCutsMenu = new WebMenu(SHORTCUTS);
-        // shortCutsMenu.setVisible(false);
-        //menuBar.add(shortCutsMenu);
+        menuBar.setLayout(new RiverLayout());
+        WebLabel label = new WebLabel("WordnetLoom 2.0");
+        label.setBoldFont();
+        ImageIcon icon = new ImageIcon(Toolkit.getDefaultToolkit().getImage("/icons/wordnet.gif"));
+        label.setIcon(icon);
+        label.setBackground(Color.GRAY);
+
+        menuBar.add("tab left hfill", label);
     }
 
     /**
@@ -59,9 +65,14 @@ public class MenuHolder {
      *
      * @param item - element do zainstalowania
      */
-    public void install(WebMenu item) {
-        menuBar.add(item);
+    public void install(WebMenu item, String alignment) {
+        menuBar.add(alignment, item);
     }
+
+    public void install(Component o, String alignment) {
+        menuBar.add(alignment, o);
+    }
+
 
     /**
      * Install menu on on given position. Negative index is counted from the
@@ -103,9 +114,7 @@ public class MenuHolder {
      * @param shortCuts - kolekcja skrótów do zainstalowania
      */
     public void setShortCuts(Collection<ShortCut> shortCuts) {
-        // shortCutsMenu.removeAll();
 
-        // po wszystkich skrotach
         for (ShortCut cut : shortCuts) {
             MMenuItem newItem = new MMenuItem(".")
                     .withKeyStroke(cut.getKeyStroke());
@@ -117,7 +126,6 @@ public class MenuHolder {
                         shortCut.doAction();
                     }
             );
-            //    shortCutsMenu.add(newItem);
         }
     }
 

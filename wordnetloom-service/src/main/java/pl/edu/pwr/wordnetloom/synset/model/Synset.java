@@ -1,16 +1,18 @@
 package pl.edu.pwr.wordnetloom.synset.model;
 
+import org.hibernate.envers.Audited;
 import pl.edu.pwr.wordnetloom.common.model.GenericEntity;
+import pl.edu.pwr.wordnetloom.dictionary.model.Status;
 import pl.edu.pwr.wordnetloom.lexicon.model.Lexicon;
 import pl.edu.pwr.wordnetloom.sense.model.Sense;
 import pl.edu.pwr.wordnetloom.synsetrelation.model.SynsetRelation;
 
 import javax.persistence.*;
-import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 
+@Audited
 @Entity
 @Table(name = "synset")
 public class Synset extends GenericEntity {
@@ -24,22 +26,32 @@ public class Synset extends GenericEntity {
     @OrderBy("synsetPosition")
     private List<Sense> senses = new ArrayList<>();
 
-    @Valid
-    @OneToOne(mappedBy = "synset", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private SynsetAttributes synsetAttributes;
-
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lexicon_id", referencedColumnName = "id", nullable = false)
     private Lexicon lexicon;
 
-    private Integer status = 0;
+    @Basic
+    @Column(name = "abstract")
+    private Boolean isAbstract = false;
+
+    @ManyToOne
+    @JoinColumn(name = "status_id", referencedColumnName = "id")
+    private Status status;
 
     @OneToMany(mappedBy = "child", fetch = FetchType.LAZY)
     private List<SynsetRelation> incomingRelations = new ArrayList<>();
 
     @OneToMany(mappedBy = "parent", fetch = FetchType.LAZY)
     private List<SynsetRelation> outgoingRelations = new ArrayList<>();
+
+    public Status getStatus() {
+        return status;
+    }
+
+    public void setStatus(Status status) {
+        this.status = status;
+    }
 
     public Integer getSplit() {
         return split;
@@ -55,14 +67,6 @@ public class Synset extends GenericEntity {
 
     public void setSenses(List<Sense> senses) {
         this.senses = senses;
-    }
-
-    public SynsetAttributes getSynsetAttributes() {
-        return synsetAttributes;
-    }
-
-    public void setSynsetAttributes(SynsetAttributes synsetAttributes) {
-        this.synsetAttributes = synsetAttributes;
     }
 
     public Lexicon getLexicon() {
@@ -89,12 +93,11 @@ public class Synset extends GenericEntity {
         this.outgoingRelations = outgoingRelations;
     }
 
-    public Integer getStatus() {
-        return status;
+    public Boolean getAbstract() {
+        return isAbstract;
     }
 
-    public void setStatus(Integer status) {
-        this.status = status;
+    public void setAbstract(Boolean anAbstract) {
+        isAbstract = anAbstract;
     }
-
 }

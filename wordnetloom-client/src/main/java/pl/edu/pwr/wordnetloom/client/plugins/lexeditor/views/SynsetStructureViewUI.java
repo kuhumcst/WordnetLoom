@@ -1,6 +1,10 @@
 package pl.edu.pwr.wordnetloom.client.plugins.lexeditor.views;
 
+import com.alee.laf.label.WebLabel;
+import com.alee.laf.list.WebList;
 import com.alee.laf.panel.WebPanel;
+import com.alee.laf.scroll.WebScrollPane;
+import com.alee.laf.text.WebTextField;
 import jiconfont.icons.FontAwesome;
 import pl.edu.pwr.wordnetloom.client.plugins.lexeditor.da.LexicalDA;
 import pl.edu.pwr.wordnetloom.client.plugins.lexeditor.frames.AbstractListFrame;
@@ -18,23 +22,23 @@ import pl.edu.pwr.wordnetloom.client.systems.listeners.SimpleListenerInterface;
 import pl.edu.pwr.wordnetloom.client.systems.listeners.SimpleListenersContainer;
 import pl.edu.pwr.wordnetloom.client.systems.managers.LexiconManager;
 import pl.edu.pwr.wordnetloom.client.systems.misc.DialogBox;
-import pl.edu.pwr.wordnetloom.client.systems.misc.Tools;
 import pl.edu.pwr.wordnetloom.client.systems.tooltips.SenseTooltipGenerator;
 import pl.edu.pwr.wordnetloom.client.systems.tooltips.ToolTipList;
-import pl.edu.pwr.wordnetloom.client.systems.ui.DialogWindow;
-import pl.edu.pwr.wordnetloom.client.systems.ui.MButton;
-import pl.edu.pwr.wordnetloom.client.systems.ui.MLabel;
-import pl.edu.pwr.wordnetloom.client.systems.ui.MTextArea;
+import pl.edu.pwr.wordnetloom.client.systems.ui.*;
 import pl.edu.pwr.wordnetloom.client.utils.Hints;
 import pl.edu.pwr.wordnetloom.client.utils.Labels;
 import pl.edu.pwr.wordnetloom.client.utils.Messages;
 import pl.edu.pwr.wordnetloom.client.workbench.abstracts.AbstractViewUI;
+import pl.edu.pwr.wordnetloom.client.workbench.interfaces.Loggable;
 import pl.edu.pwr.wordnetloom.lexicon.model.Lexicon;
 import pl.edu.pwr.wordnetloom.partofspeech.model.PartOfSpeech;
 import pl.edu.pwr.wordnetloom.relationtype.model.RelationArgument;
 import pl.edu.pwr.wordnetloom.relationtype.model.RelationType;
 import pl.edu.pwr.wordnetloom.sense.model.Sense;
+import pl.edu.pwr.wordnetloom.synset.exception.InvalidLexiconException;
+import pl.edu.pwr.wordnetloom.synset.exception.InvalidPartOfSpeechException;
 import pl.edu.pwr.wordnetloom.synset.model.Synset;
+import pl.edu.pwr.wordnetloom.synset.model.SynsetAttributes;
 import se.datadosen.component.RiverLayout;
 
 import javax.swing.*;
@@ -44,7 +48,9 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import java.awt.*;
 import java.awt.event.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -53,25 +59,8 @@ import java.util.List;
  * @author Max
  */
 public class SynsetStructureViewUI extends AbstractViewUI implements
-        ActionListener, ListSelectionListener, CaretListener, MouseListener {
+        ActionListener, ListSelectionListener, CaretListener, MouseListener, Loggable {
 
-    private ViWordNetService viWordNetService;
-
-    private static final String SUPER_MODE = "SuperMode";
-    private static final String SUPER_MODE_VALUE = "1";
-
-    /**
-     * relacja dla synsetow
-     */
-    public static final int SYNSET_RELATIONS = 0;
-    /**
-     * przejscie do perspektywy leksyklanej
-     */
-    public static final int LEXICAL_PERSPECTIVE = 1;
-    /**
-     * zmienilo sie zaznaczenie na liscie
-     */
-    private static final int LIST_SELECTION_CHANGED = 2;
     /**
      * usunieto jednostke z synsetu
      */
@@ -80,42 +69,42 @@ public class SynsetStructureViewUI extends AbstractViewUI implements
      * nowa jednostka zostala stworzona (dodane do systemu)
      */
     public static final int UNIT_CREATED = 4;
-
-    private JList unitsList;
-    private JTextField synsetID;
-    private JLabel synsetOwner;
-    private JLabel isAbstract;
+    /**
+     * zmienilo sie zaznaczenie na liscie
+     */
+    private static final int LIST_SELECTION_CHANGED = 2;
+    private final SimpleListenersContainer clickListeners = new SimpleListenersContainer();
+    private final SimpleListenersContainer synsetUpdateListeners = new SimpleListenersContainer();
+    private final UnitsInSynsetListModel listModel = new UnitsInSynsetListModel();
+    private final ViwnGraphViewUI graphUI;
+    ArrayList<Sense> lastSelectedUnits = new ArrayList<>();
+    private ViWordNetService viWordNetService;
+    private WebList unitsList;
+    private WebTextField synsetID;
+    private WebTextField princentonID;
+    private WebTextField iliID;
+    private WebLabel synsetOwner;
+    private WebLabel isAbstract;
     private MButton buttonUp, buttonDown, buttonAdd, buttonDelete,
             buttonRelations, buttonSwitchToLexicalPerspective, buttonToNew;
     private Collection<Sense> lastUnits = null;
     private MTextArea commentValue = null;
-    ArrayList<Sense> lastSelectedUnits = new ArrayList<>();
-
-    private final SimpleListenersContainer clickListeners = new SimpleListenersContainer();
-    private final SimpleListenersContainer synsetUpdateListeners = new SimpleListenersContainer();
-
-    private final UnitsInSynsetListModel listModel = new UnitsInSynsetListModel();
     private Synset lastSynset = null;
-    private final boolean showRelations;
-    private final boolean showSwitch;
-    private final boolean bottomButtons;
-    private final ViwnGraphViewUI graphUI;
+
+
+    public SynsetStructureViewUI(ViwnGraphViewUI graphUI) {
+        this.graphUI = graphUI;
+    }
 
     /**
-     * konstruktor
+     * formatowanie wartości, tak aby nie bylo nulla
      *
-     * @param showRelations - czy pokazać przycisk z relacjami
-     * @param showSwitch    - czy pokazać przycisk do przelaczania sie do jednostek
-     * @param bottomButtons - czy przyciski maja byc na dole (true) czy z boku
-     *                      (false)
-     * @param graphUI
+     * @param value - wartość wejsciowa
+     * @return wartośc wjesciowa lub "brak danych" gdy był null
      */
-    public SynsetStructureViewUI(boolean showRelations, boolean showSwitch,
-                                 boolean bottomButtons, ViwnGraphViewUI graphUI) {
-        this.showRelations = showRelations;
-        this.showSwitch = showSwitch;
-        this.bottomButtons = bottomButtons;
-        this.graphUI = graphUI;
+    private static String formatValue(String value) {
+        return (value == null || value.length() == 0) ? Labels.VALUE_UNKNOWN
+                : value;
     }
 
     /**
@@ -132,13 +121,26 @@ public class SynsetStructureViewUI extends AbstractViewUI implements
         // ustawienie layoutu
         content.setLayout(new RiverLayout());
 
-        synsetOwner = new JLabel("");
+        synsetOwner = new WebLabel("");
 
         // synset id
-        synsetID = new JTextField("");
+        synsetID = new WebTextField("");
         synsetID.setEditable(false);
-        synsetID.setBackground(null); //this is the same as a JLabel
-        synsetID.setBorder(null); //remove the border
+        synsetID.setDrawBackground(false);
+        synsetID.setDrawBorder(false);
+        synsetID.setDrawShade(false);
+
+        princentonID = new WebTextField("");
+        princentonID.setEditable(false);
+        princentonID.setDrawBackground(false);
+        princentonID.setDrawBorder(false);
+        princentonID.setDrawShade(false);
+
+        iliID = new WebTextField("");
+        iliID.setEditable(false);
+        iliID.setDrawBorder(false);
+        iliID.setDrawBackground(false);
+        iliID.setDrawShade(false);
 
         refreshData(null);
 
@@ -148,14 +150,13 @@ public class SynsetStructureViewUI extends AbstractViewUI implements
         unitsList.addMouseListener(this);
         unitsList.setEnabled(false);
 
-        commentValue = new MTextArea(Labels.VALUE_UNKNOWN);
+        commentValue = new MTextArea("");
         commentValue.addCaretListener(this);
         commentValue.setRows(3);
         commentValue.setEnabled(false);
 
-        isAbstract = new JLabel();
+        isAbstract = new WebLabel();
 
-        // dodanie przyciskow
         buttonUp = MButton.buildUpButton()
                 .withToolTip(Hints.MOVE_UNIT_UP)
                 .withEnabled(false)
@@ -208,128 +209,133 @@ public class SynsetStructureViewUI extends AbstractViewUI implements
         installViewScopeShortCut(buttonSwitchToLexicalPerspective,
                 KeyEvent.CTRL_MASK, KeyEvent.VK_L);
 
-        // panel dolny z przyciskami
-        JPanel buttonsPanel = new JPanel();
-        buttonsPanel.setLayout(new RiverLayout(0, 0));
-        if (bottomButtons) {
-            buttonsPanel.add("", buttonUp);
-            buttonsPanel.add("", buttonAdd);
-            if (showRelations) {
-                buttonsPanel.add("", buttonRelations);
-            }
-            buttonsPanel.add("br", buttonDown);
-            buttonsPanel.add("", buttonDelete);
-            buttonsPanel.add("", buttonToNew);
-            if (showSwitch) {
-                buttonsPanel.add("", buttonSwitchToLexicalPerspective);
-            }
-        } else {
-            buttonsPanel.add("", buttonUp);
-            buttonsPanel.add("br", buttonDown);
-            buttonsPanel.add("br", buttonAdd);
-            buttonsPanel.add("br", buttonDelete);
-            buttonsPanel.add("br", buttonToNew);
-            if (showRelations) {
-                buttonsPanel.add("br", buttonRelations);
-            }
-            if (showSwitch) {
-                buttonsPanel.add("br", buttonSwitchToLexicalPerspective);
-            }
-        }
+        MButtonPanel buttonsPanel = new MButtonPanel(buttonUp, buttonDown, buttonAdd, buttonDelete, buttonToNew)
+                .withVerticalLayout();
 
         // dodanie do okna
         content.add("", new MLabel(Labels.LEXICAL_UNITS_IN_SYSET_COLON, 'y',
                 unitsList));
-        content.add("br hfill vfill", new JScrollPane(unitsList));
-        if (!bottomButtons) {
-            content.add("", buttonsPanel);
-            content.add("br", new JLabel(Labels.COMMENT_COLON));
-            content.add("br", commentValue);
 
-        }
-        content.add("br", isAbstract);
+        WebPanel synsetContentPanel = new WebPanel();
+        synsetContentPanel.setLayout(new RiverLayout(0, 0));
 
-        content.add("br", new JLabel("Synset Id:"));
-        content.add("", synsetID);
+        WebScrollPane scroll = new WebScrollPane(unitsList);
+        scroll.setMaximumSize(new Dimension(0, 140));
+        scroll.setMinimumSize(new Dimension(0, 140));
+        scroll.setPreferredSize(new Dimension(0, 140));
 
-        content.add("br", new JLabel(Labels.OWNER_COLON));
-        content.add("", synsetOwner);
-        if (bottomButtons) {
-            content.add("br vtop", new JLabel(Labels.COMMENT_COLON));
-            content.add("", commentValue);
-            content.add("br center", buttonsPanel);
-        }
+        synsetContentPanel.add("hfill", scroll);
+        synsetContentPanel.add("", buttonsPanel);
+
+        content.add("br hfill", synsetContentPanel);
+
+        WebPanel properties = new WebPanel();
+        properties.setLayout(new RiverLayout(0, 0));
+
+        properties.add("br vtop", new JLabel(Labels.COMMENT_COLON));
+        properties.add("br", commentValue);
+
+        properties.add("br", isAbstract);
+
+        properties.add("br", new WebLabel("Synset Id:"));
+        properties.add("", synsetID);
+
+        properties.add("br", new WebLabel("Princeton Id:"));
+        properties.add("", princentonID);
+
+        properties.add("br", new WebLabel("ILI Id:"));
+        properties.add("", iliID);
+
+        properties.add("br", new WebLabel(Labels.OWNER_COLON));
+        properties.add("", synsetOwner);
+
+        WebScrollPane scr = new WebScrollPane(properties);
+        scr.setDrawBorder(false);
+
+        content.add("br vfill hfill", scr);
     }
 
-    private void setSplitPosition(int newSplitPosition){
+    private void setSplitPosition(int newSplitPosition) {
         lastSynset.setSplit(newSplitPosition);
-        lastSynset = RemoteService.synsetRemote.updateSynset(lastSynset);
+        lastSynset = RemoteService.synsetRemote.save(lastSynset);
         listModel.setSplitPosition(newSplitPosition);
     }
 
-    private void moveUnitUp(int senseIndex){
-        moveUnit(senseIndex, senseIndex -1, true);
+    private void moveUnitUp(int senseIndex) {
+        moveUnit(senseIndex, senseIndex - 1, true);
     }
 
-    private void moveUnitDown(int senseIndex){
+    private void moveUnitDown(int senseIndex) {
         moveUnit(senseIndex, senseIndex + 1, false);
     }
 
-    private void moveUnit(int sourceIndex, int destIndex, boolean moveUp){
+    private void moveUnit(int sourceIndex, int destIndex, boolean moveUp) {
         int splitPosition = listModel.getLineSplitPosition();
-        if(sourceIndex == splitPosition){
+        if (sourceIndex == splitPosition) {
             setSplitPosition(destIndex);
-        } else if(destIndex == splitPosition) {
+        } else if (destIndex == splitPosition) {
             int newSplitPosition = moveUp ? destIndex + 1 : destIndex - 1;
             setSplitPosition(newSplitPosition);
         } else {
-            exchangeUnitsInSynset(sourceIndex, destIndex,splitPosition, listModel);
+            replaceUnitsInSynset(sourceIndex, destIndex, splitPosition, listModel);
         }
 
         unitsList.updateUI();
-        int newSelectedPosition = moveUp ? sourceIndex -1 : sourceIndex + 1;
+        int newSelectedPosition = moveUp ? sourceIndex - 1 : sourceIndex + 1;
         unitsList.setSelectedIndex(newSelectedPosition);
-        // jeżeli przesunięto pierwszą pozycję należy zaktualizować synset na grafie (zmiana etykiety)
-        if(sourceIndex == 0 || destIndex == 0){
+        // if move element to first position, we must update synset name on the graph (replace label)
+        if (sourceIndex == 0 || destIndex == 0) {
             updateNodeNameOnGraph();
         }
     }
 
-    private void exchangeUnitsInSynset(int senseIndex1, int senseIndex2, int splitPosition, UnitsInSynsetListModel listModel){
+    private void replaceUnitsInSynset(int senseIndex1, int senseIndex2, int splitPosition, UnitsInSynsetListModel listModel) {
         assert senseIndex1 > 0 && senseIndex2 > 0;
         assert senseIndex1 < listModel.getSize() && senseIndex2 < listModel.getSize();
 
-        // określenie jednostek
         Sense sense1 = listModel.getObjectAt(senseIndex1);
         Sense sense2 = listModel.getObjectAt(senseIndex2);
-        // pobranie pozycj jednostek w synsecie
-        int sense1Position = sense1.getSynsetPosition();
-        int sense2Position = sense2.getSynsetPosition();
-        // zamiana  pozycji w synsecie oraz zapisanie zmian w bazie danych
-        sense1.setSynsetPosition(sense2Position);
-        sense2.setSynsetPosition(sense1Position);
-        RemoteService.senseRemote.persist(sense1);
-        RemoteService.senseRemote.persist(sense2);
-        // zamiana jednostek na liście
-        int indexOnList1 = senseIndex1 >= splitPosition ? senseIndex1 - 1  : senseIndex1;
-        int indexOnList2 = senseIndex2 >= splitPosition ? senseIndex2 - 1  : senseIndex2;
+
+        replaceSynsetPositions(sense1, sense2);
+        replaceSensesOnList(senseIndex1, senseIndex2, splitPosition, listModel);
+        saveSensesInDatabase(sense1, sense2);
+    }
+
+    private void replaceSensesOnList(int senseIndex1, int senseIndex2, int splitPosition, UnitsInSynsetListModel listModel) {
+        int indexOnList1 = senseIndex1 >= splitPosition ? senseIndex1 - 1 : senseIndex1;
+        int indexOnList2 = senseIndex2 >= splitPosition ? senseIndex2 - 1 : senseIndex2;
         List<Sense> sensesList = new ArrayList<>(listModel.getCollection());
         Collections.swap(sensesList, indexOnList1, indexOnList2);
         listModel.setCollection(sensesList);
     }
 
-    private void updateNodeNameOnGraph(){
+    private void replaceSynsetPositions(Sense sense1, Sense sense2) {
+        int sense1Position = sense1.getSynsetPosition();
+        int sense2Position = sense2.getSynsetPosition();
+
+        sense1.setSynsetPosition(sense2Position);
+        sense2.setSynsetPosition(sense1Position);
+    }
+
+    private void saveSensesInDatabase(Sense sense1, Sense sense2) {
+        RemoteService.senseRemote.save(sense1);
+        RemoteService.senseRemote.save(sense2);
+    }
+
+    /**
+     * Update synset label on the graph from name of first (head) unit in synset
+     */
+    private void updateNodeNameOnGraph() {
         ViwnNode node = graphUI.getSelectedNode();
-        if(node != null && node instanceof ViwnNodeSynset){
-            ViwnNodeSynset s = (ViwnNodeSynset)node;
+        if (node != null && node instanceof ViwnNodeSynset) {
+            ViwnNodeSynset s = (ViwnNodeSynset) node;
             // pobieramy głowę synsetu, ponieważ jednostki na liście nie mają zaadowanej domeny, która jest potrzebna do stworzenia opisu węza
+            // we get head of synset(first sense), because we need domain to create label. Senses in list haven't domain
             Sense firstSense = RemoteService.senseRemote.findHeadSenseOfSynset(lastSynset.getId());
             getViWordNetService().getSynsetData().changeLabel(lastSynset.getId(), firstSense);
             s.setLabel(null);
+            graphUI.updateSynset(s);
         }
-        graphUI.graphChanged();
-        //TODO zrobić tak, żeby zmieniał się tylko jeden węzeł, bez poprawiania grafu
-        graphUI.refreshView(lastSynset);
     }
 
     private void addUnitToSynset() {
@@ -347,26 +353,27 @@ public class SynsetStructureViewUI extends AbstractViewUI implements
             clickListeners.notifyAllListeners(lastSynset, UNIT_CREATED);
         }
         if (selectedUnits != null) {
-            // okienko z testami dla relacji, nie wyswietla gdy nie ma
-            // takich relacji w bazie
-//                if (LexicalDA.areRelations(RelationArgument.LEXICAL_SPECIAL)) {
-//                    IRelationType rel;
-//                    rel = RelationTypeFrame.showModal(workbench,
-//                            RelationArgument.LEXICAL_SPECIAL, LexicalDA.getPos(lastSynset, LexiconManager.getInstance().getLexicons()),
-            //  RemoteUtils.lexicalUnitRemote.dbFastGetUnits(lastSynset, LexiconManager.getInstance().getLexicons()), selectedUnits);
-            // if (rel == null) {
-            //      return;
-            // }
             for (Sense selectedUnit : selectedUnits) {
                 // dodanie powiazanie
                 selectedUnit.setSynset(lastSynset);
-                RemoteService.synsetRemote.addSenseToSynset(selectedUnit, lastSynset);
+
+                try {
+                    RemoteService.synsetRemote.addSenseToSynset(selectedUnit, lastSynset);
+                } catch (InvalidPartOfSpeechException poe) {
+                    logger().error("Error", poe);
+                } catch (InvalidLexiconException lox) {
+                    logger().error("Error", lox);
+                }
             }
-            Collection<Sense> sensesInSynset = RemoteService.senseRemote.findBySynset(lastSynset, LexiconManager.getInstance().getLexiconsIds());
-            listModel.setCollection(sensesInSynset); //TODO sprawdzić, czy nie da rady zrobić tego bez pobierania jednostek
-            unitsList.updateUI();
-            getViWordNetService().refreshViews();
+            addUnitsToList(lastSynset);
         }
+    }
+
+    private void addUnitsToList(Synset synset) {
+        Collection<Sense> sensesInSynset = RemoteService.senseRemote.findBySynset(synset, LexiconManager.getInstance().getLexiconsIds());
+        listModel.setCollection(sensesInSynset); //TODO sprawdzić, czy nie da rady zrobić tego bez pobierania jednostek
+        unitsList.updateUI();
+        getViWordNetService().refreshViews();
     }
 
     private void deleteUnitFromSynset() {
@@ -376,7 +383,7 @@ public class SynsetStructureViewUI extends AbstractViewUI implements
         int answer;
         int unitsCount = lastSynset.getSenses().size();
         boolean deleteSynset;
-        if(selectedUnits.size() == unitsCount){
+        if (selectedUnits.size() == unitsCount) {
             answer = DialogBox.showYesNo(Messages.QUESTION_DELETE_SYNSET);
             deleteSynset = true;
         } else {
@@ -384,20 +391,19 @@ public class SynsetStructureViewUI extends AbstractViewUI implements
             deleteSynset = false;
         }
 
-        if(answer == DialogBox.YES){
+        if (answer == DialogBox.YES) {
             RemoteService.synsetRemote.deleteSensesFromSynset(selectedUnits, lastSynset);
             // usunięcie jednostki z listy
             Collection<Sense> sensesOnList = listModel.getCollection();
             sensesOnList.removeAll(selectedUnits);
             listModel.setCollection(sensesOnList);
-            if(deleteSynset){
-                //
+            if (deleteSynset) {
                 RemoteService.synsetRemote.delete(lastSynset);
                 listModel.setCollection(null);
 //                refreshData(lastSynset);
                 //TODO zrobić usunięcie synsetu z grafu
                 getViWordNetService().refreshViews();
-            } else if(lastSynset.getSplit() > listModel.getSize()){
+            } else if (lastSynset.getSplit() > listModel.getSize()) {
                 // jeżeli po usunięciu jednostek podział jest większy niż liczba elementów na liście, należy przesunąć podział na ostatnie miejsce
                 updateSplitPosition(listModel.getSize());
             }
@@ -405,40 +411,52 @@ public class SynsetStructureViewUI extends AbstractViewUI implements
         }
     }
 
-    private void updateSplitPosition(int newSplitPosition){
+    private void updateSplitPosition(int newSplitPosition) {
         lastSynset.setSplit(newSplitPosition);
         listModel.setSplitPosition(newSplitPosition);
-        RemoteService.synsetRemote.updateSynset(lastSynset);
+        RemoteService.synsetRemote.save(lastSynset);
     }
 
     private void moveToNewSynset() {
-        //TODO można dodać ograniczniki, sprawdzające warunki wstępne
         int unitsInSynsetCount = listModel.getSize();
         Collection<Sense> selectedUnits = getSelectedUnits();
         // nie można przenieść wszystkich jednostek z synsetu
-        if(selectedUnits.size() == unitsInSynsetCount) {
+        if (selectedUnits.size() == unitsInSynsetCount) {
             DialogBox.showError(Messages.ERROR_CANNOT_MOVE_ALL_UNITS_FROM_SYNSET);
             return;
         }
         // wyświetlenie okienka do ustalenia relacji między starym i nowym synsetem
         PartOfSpeech partOfSpeech = listModel.getObjectAt(0).getPartOfSpeech();
-        final RelationType relationType = RelationTypeFrame.showModal(workbench, RelationArgument.SYNSET_RELATION, partOfSpeech,lastSynset.getSenses() , selectedUnits);
-        if(relationType == null){
+
+        RelationType relationType = RelationTypeFrame.showModal(workbench, RelationArgument.SYNSET_RELATION, partOfSpeech, lastSynset.getSenses(), selectedUnits);
+
+        if (relationType == null) {
             return;
         }
+
         Synset synsetToSave = new Synset();
         Lexicon lexicon = selectedUnits.iterator().next().getLexicon();
         synsetToSave.setLexicon(lexicon);
-        Synset newSynset = RemoteService.synsetRemote.updateSynset(synsetToSave);
-        for(Sense sense : selectedUnits){
-            RemoteService.synsetRemote.addSenseToSynset(sense, newSynset);
+
+        Synset newSynset = RemoteService.synsetRemote.save(synsetToSave);
+
+        for (Sense sense : selectedUnits) {
+            try {
+                RemoteService.synsetRemote.addSenseToSynset(sense, newSynset);
+            } catch (InvalidPartOfSpeechException poe) {
+                logger().error("Error", poe);
+            } catch (InvalidLexiconException lox) {
+                logger().error("Error", lox);
+            }
         }
+
         RemoteService.synsetRelationRemote.makeRelation(lastSynset, newSynset, relationType);
         // usunięcie przeniesionych jednostek z listy
         Collection<Sense> unitsInSynset = listModel.getCollection();
         unitsInSynset.removeAll(selectedUnits);
         listModel.setCollection(unitsInSynset);
-        if(lastSynset.getSplit() > listModel.getSize()){
+
+        if (lastSynset.getSplit() > listModel.getSize()) {
             updateSplitPosition(listModel.getSize());
         }
         unitsList.updateUI();
@@ -454,18 +472,18 @@ public class SynsetStructureViewUI extends AbstractViewUI implements
     public void actionPerformed(ActionEvent event) {
         int index = unitsList.getSelectedIndex(); // odczytanie zaznaczenia
         if (event.getSource() == buttonUp) { // czy przycisk W GÓRE
-           moveUnitUp(index);
+            moveUnitUp(index);
         } else if (event.getSource() == buttonDown) { // czy przycos W DÓŁ
             moveUnitDown(index);
         } else if (event.getSource() == buttonAdd) { // dodanie nowego leksemu
             addUnitToSynset();
-        } else if(event.getSource() == buttonDelete) {
+        } else if (event.getSource() == buttonDelete) {
             deleteUnitFromSynset();
-        } else if(event.getSource() == buttonToNew){
+        } else if (event.getSource() == buttonToNew) {
             moveToNewSynset();
         }
         //TODO sprawdzić czy zostały jeszcze jakieś przyciski do obsłużenia
-            // odswiezenie danych
+        // odswiezenie danych
 
 //                refreshData(lastSynset);
 //                getViWordNetService().refreshViews();
@@ -541,7 +559,7 @@ public class SynsetStructureViewUI extends AbstractViewUI implements
 //            }
 //            Collection<Sense> unitsOfMainSynset = RelationsDA.getUnits(
 //                    lastSynset, lastSelectedUnits, LexiconManager.getInstance().getLexicons());
-//            final IRelationType rel = RelationTypeFrame.showModal(workbench,
+//            final IRelationType rel = RelationTypeFrame.showModalAndSaveRelation(workbench,
 //                    RelationArgument.SYNSET, RelationsDA.getPos(lastSynset, LexiconManager.getInstance().getLexicons()),
 //                    unitsOfMainSynset, lastSelectedUnits);
 //            if (rel == null) {
@@ -662,17 +680,6 @@ public class SynsetStructureViewUI extends AbstractViewUI implements
     }
 
     /**
-     * formatowanie wartości, tak aby nie bylo nulla
-     *
-     * @param value - wartość wejsciowa
-     * @return wartośc wjesciowa lub "brak danych" gdy był null
-     */
-    private static String formatValue(String value) {
-        return (value == null || value.length() == 0) ? Labels.VALUE_UNKNOWN
-                : value;
-    }
-
-    /**
      * odswiezenie danych w widoku
      *
      * @param synset - powiazany senset
@@ -687,18 +694,20 @@ public class SynsetStructureViewUI extends AbstractViewUI implements
             newSplitPoint = synset.getSplit();
             // odczytanie jednostek
             units = RemoteService.senseRemote.findBySynset(synset, LexiconManager.getInstance().getLexiconsIds());
-//            units = RemoteUtils.lexicalUnitRemote.dbFastGetUnits(synset, LexiconManager.getInstance().getLexicons());
-//            if (units == null) {
-//                units = LexicalDA.getLexicalUnits(synset, LexiconManager.getInstance().getLexicons());
-//            }
-//            commentValue.setText(synset != null ? formatValue(Common.getSynsetAttribute(synset, Synset.COMMENT)) : formatValue(null));
-//            if (Synset.isAbstract(Common.getSynsetAttribute(synset, Synset.ISABSTRACT))) {
-//                isAbstract.setText(String.format("<html><font color=red>%s</font></html>", Labels.SYNSET_ARTIFICIAL));
-//            } else {
-//                isAbstract.setText("");
-//            }
+//            addUnitsToList(synset);
+            SynsetAttributes sa = RemoteService.synsetRemote.fetchSynsetAttributes(synset.getId());
+
+            commentValue.setText(sa.getComment() != null ? sa.getComment() : "");
+            if (synset.getAbstract()) {
+                isAbstract.setText(String.format("<html><font color=red>%s</font></html>", Labels.SYNSET_ARTIFICIAL));
+            } else {
+                isAbstract.setText("");
+            }
             synsetID.setText(Long.toString(synset.getId()));
-            //  synsetOwner.setText(synset != null ? formatValue(Common.getSynsetAttribute(synset, Synset.OWNER)) : formatValue(null));
+            princentonID.setText(sa.getPrincetonId());
+            iliID.setText(sa.getIliId());
+
+            synsetOwner.setText(sa.getOwner() != null ? sa.getOwner().getFullname() : "");
         }
 
 
@@ -725,7 +734,7 @@ public class SynsetStructureViewUI extends AbstractViewUI implements
                     .getIndexesOfSelectedElements(selectedUnits) : null;
             // zaznaczenie odpowiedniego elementu
             if (indices != null && indices.size() > 0) {
-                unitsList.setSelectedIndices(Tools.getInstance().collectionToArray(indices));
+                unitsList.setSelectedIndices(indices.stream().mapToInt(Integer::intValue).toArray());
                 valueChanged(new ListSelectionEvent(
                         synset == null ? new Object() : synset, 0, 0, false));
             } else if (listModel.getSize() > 0) {
@@ -777,13 +786,16 @@ public class SynsetStructureViewUI extends AbstractViewUI implements
 
         if (e.getButton() == MouseEvent.BUTTON3 && idx != -1
                 && idx != listModel.getLineSplitPosition()) {
+
             Sense unit = listModel.getObjectAt(idx);
             unit = RemoteService.senseRemote.fetchSense(unit.getId());
 
             LexicalUnitPropertiesViewUI lui = new LexicalUnitPropertiesViewUI(graphUI);
             lui.init(workbench);
+
             DialogWindow dia = new DialogWindow(workbench.getFrame(), Labels.UNIT_PROPERTIES, 585, 520);
             WebPanel pan = new WebPanel();
+
             lui.initialize(pan);
             lui.refreshData(unit);
             lui.closeWindow((ActionEvent e1) -> {

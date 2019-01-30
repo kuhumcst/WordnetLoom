@@ -1,5 +1,6 @@
 package pl.edu.pwr.wordnetloom.lexicon.model;
 
+import org.hibernate.envers.Audited;
 import pl.edu.pwr.wordnetloom.common.model.GenericEntity;
 
 import javax.persistence.Column;
@@ -8,6 +9,7 @@ import javax.persistence.Table;
 import javax.validation.constraints.NotNull;
 import java.util.Objects;
 
+@Audited
 @Entity
 @Table(name = "lexicon")
 public class Lexicon extends GenericEntity {
@@ -26,6 +28,8 @@ public class Lexicon extends GenericEntity {
 
     @Column(name = "lexicon_version")
     private String lexiconVersion;
+
+    private String icon;
 
     public Lexicon() {
     }
@@ -66,6 +70,14 @@ public class Lexicon extends GenericEntity {
 
     public void setLexiconVersion(String lexiconVersion) {
         this.lexiconVersion = lexiconVersion;
+    }
+
+    public String getIcon() {
+        return icon;
+    }
+
+    public void setIcon(String icon) {
+        this.icon = icon;
     }
 
     @Override

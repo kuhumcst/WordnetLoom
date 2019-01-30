@@ -1,5 +1,7 @@
 package pl.edu.pwr.wordnetloom.relationtype.model;
 
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.NotAudited;
 import pl.edu.pwr.wordnetloom.common.model.GenericEntity;
 import pl.edu.pwr.wordnetloom.common.model.NodeDirection;
 import pl.edu.pwr.wordnetloom.lexicon.model.Lexicon;
@@ -14,6 +16,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+@Audited
 @Entity
 @Table(name = "relation_type")
 public class RelationType extends GenericEntity {
@@ -52,7 +55,9 @@ public class RelationType extends GenericEntity {
     @Column(name = "short_display_text_id")
     private Long shortDisplayText;
 
-    @OneToMany(mappedBy = "relationType", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @NotAudited
+    @OneToMany(mappedBy = "relationType", fetch = FetchType.LAZY)
+    @OrderBy("position")
     private List<RelationTest> relationTests = new ArrayList<>();
 
     @NotNull
@@ -80,6 +85,9 @@ public class RelationType extends GenericEntity {
     @Column(name = "node_position")
     @Enumerated(EnumType.STRING)
     private NodeDirection nodePosition = NodeDirection.IGNORE;
+
+    @NotAudited
+    private Integer priority;
 
     @Column
     private String color = "#ffffff";
@@ -223,4 +231,22 @@ public class RelationType extends GenericEntity {
         this.multilingual = multilingual;
     }
 
+    public Integer getPriority() {
+        return priority;
+    }
+
+    public int getOrder(){
+        if(priority == null){
+            return 0;
+        } //TODO zlikwidowac ten warunkek. Został wstawiony, aby przechodziły testy. W testach należy do danych dodać pozycje
+        final int POSITION_FACTOR = 100;
+        if(getParent() != null){
+            return getParent().getOrder() + priority;
+        }
+        return priority * POSITION_FACTOR;
+    }
+
+    public void setPriority(Integer position){
+        this.priority = position;
+    }
 }

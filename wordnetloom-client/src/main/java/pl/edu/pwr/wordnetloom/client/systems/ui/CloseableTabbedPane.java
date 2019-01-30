@@ -875,13 +875,16 @@ public class CloseableTabbedPane extends WebTabbedPane implements MouseListener,
                                    Rectangle iconRect, Rectangle textRect, boolean isSelected) {
 
             textRect.x = textRect.y = iconRect.x = iconRect.y = 0;
-
-            javax.swing.text.View v = getTextViewForTab(tabIndex);
-            if (v != null) {
-                tabPane.putClientProperty("html", v);
+            try {
+                javax.swing.text.View v = getTextViewForTab(tabIndex);
+                if (v != null) {
+                    tabPane.putClientProperty("html", v);
+                }
+            } catch (Exception ex){
+                System.out.println("Errro 2");
             }
 
-            SwingUtilities.layoutCompoundLabel((JComponent) tabPane, metrics,
+            SwingUtilities.layoutCompoundLabel(tabPane, metrics,
                     title, icon, SwingUtilities.CENTER, SwingUtilities.CENTER,
                     SwingUtilities.CENTER,
                     // SwingUtilities.TRAILING,
@@ -945,12 +948,15 @@ public class CloseableTabbedPane extends WebTabbedPane implements MouseListener,
 
             textRect.x = textRect.y = iconRect.x = iconRect.y = 0;
 
-            javax.swing.text.View v = getTextViewForTab(tabIndex);
-            if (v != null) {
-                tabPane.putClientProperty("html", v);
+            try {
+                javax.swing.text.View v = getTextViewForTab(tabIndex);
+                if (v != null) {
+                    tabPane.putClientProperty("html", v);
+                }
+            }catch (Exception ex){
+                System.out.println("Bład !!!!");
             }
-
-            SwingUtilities.layoutCompoundLabel((JComponent) tabPane, metrics,
+            SwingUtilities.layoutCompoundLabel(tabPane, metrics,
                     title, icon, SwingUtilities.CENTER, SwingUtilities.CENTER,
                     SwingUtilities.CENTER,
                     // SwingUtilities.TRAILING,

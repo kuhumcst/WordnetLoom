@@ -19,6 +19,7 @@ package pl.edu.pwr.wordnetloom.client.plugins.lexeditor.frames;
 
 import pl.edu.pwr.wordnetloom.client.plugins.lexeditor.da.LexicalDA;
 import pl.edu.pwr.wordnetloom.client.remote.RemoteService;
+import pl.edu.pwr.wordnetloom.client.systems.common.Pair;
 import pl.edu.pwr.wordnetloom.client.systems.common.ValueContainer;
 import pl.edu.pwr.wordnetloom.client.systems.managers.LexiconManager;
 import pl.edu.pwr.wordnetloom.client.systems.misc.DialogBox;
@@ -26,15 +27,15 @@ import pl.edu.pwr.wordnetloom.client.utils.Labels;
 import pl.edu.pwr.wordnetloom.client.utils.Messages;
 import pl.edu.pwr.wordnetloom.client.workbench.interfaces.Workbench;
 import pl.edu.pwr.wordnetloom.partofspeech.model.PartOfSpeech;
-import pl.edu.pwr.wordnetloom.sense.model.Sense;
 import pl.edu.pwr.wordnetloom.sense.dto.SenseCriteriaDTO;
+import pl.edu.pwr.wordnetloom.sense.model.Sense;
+import pl.edu.pwr.wordnetloom.sense.model.SenseAttributes;
 
 import javax.swing.*;
 import java.util.Collection;
 
 /**
  * klasa dostarczajace okno z lista jednostek leksykalnych
- *
  */
 public class UnitsListFrame extends AbstractListFrame<Sense, PartOfSpeech> {
 
@@ -76,7 +77,7 @@ public class UnitsListFrame extends AbstractListFrame<Sense, PartOfSpeech> {
         } else {
             SenseCriteriaDTO dto = new SenseCriteriaDTO();
             dto.setLemma(filter);
-            if(pos != null){
+            if (pos != null) {
                 dto.setPartOfSpeechId(pos.getId());
             }
             dto.setLexicons(LexiconManager.getInstance().getUserChosenLexiconsIds());
@@ -87,11 +88,12 @@ public class UnitsListFrame extends AbstractListFrame<Sense, PartOfSpeech> {
 
     @Override
     protected void invokeNew() {
-        // wyswiętlanie okienka z parametrami
-        Sense newUnit = NewLexicalUnitFrame.showModal(workbench, filterObject);
+
+        Pair<Sense, SenseAttributes> newUnit = NewLexicalUnitFrame.showModal(workbench, filterObject);
         if (newUnit != null) {
-            RemoteService.senseRemote.persist(newUnit);
-            filterEdit.setText(newUnit.getWord().getWord());
+            Sense sense = RemoteService.senseRemote.save(newUnit.getA());
+            RemoteService.senseRemote.addSenseAttribute(sense.getId(), newUnit.getB());
+            filterEdit.setText(sense.getWord().getWord());
             unitWasCreated = true;
             refreshListModel();
         }
@@ -109,9 +111,10 @@ public class UnitsListFrame extends AbstractListFrame<Sense, PartOfSpeech> {
                                               boolean multiSelect,
                                               PartOfSpeech filterObject,
                                               ValueContainer<Boolean> unitWasCreated) {
+
         UnitsListFrame frame = new UnitsListFrame(workbench, x, y);
         frame.setFilterObject(filterObject);
-        frame.setMultSelect(multiSelect);
+        frame.setMultiSelect(multiSelect);
         frame.execute(filterObject);
         unitWasCreated.setValue(frame.unitWasCreated);
         return frame.selectedElements;

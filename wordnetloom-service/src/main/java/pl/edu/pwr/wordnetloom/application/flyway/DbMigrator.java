@@ -2,7 +2,6 @@ package pl.edu.pwr.wordnetloom.application.flyway;
 
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationInfo;
-
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import javax.ejb.*;

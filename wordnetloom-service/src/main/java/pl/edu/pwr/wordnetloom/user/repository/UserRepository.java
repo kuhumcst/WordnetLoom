@@ -9,6 +9,7 @@ import javax.ejb.TransactionAttribute;
 import javax.ejb.TransactionAttributeType;
 import javax.inject.Inject;
 import javax.persistence.EntityManager;
+import javax.persistence.NoResultException;
 
 @Stateless
 public class UserRepository extends GenericRepository<User> {
@@ -17,7 +18,7 @@ public class UserRepository extends GenericRepository<User> {
     EntityManager em;
 
     @TransactionAttribute(TransactionAttributeType.REQUIRED)
-    public void saveOrUpdate(User user) {
+    public void save(User user) {
         if (null != user.getId()) {
             em.merge(user);
         } else {
@@ -26,16 +27,18 @@ public class UserRepository extends GenericRepository<User> {
     }
 
     public User findUserByEmail(String email) {
-        return em.createQuery("SELECT u FROM User u WHERE u.email = :email", User.class)
-                .setParameter("email", email)
-                .getSingleResult();
+       try {
+           return em.createQuery("SELECT u FROM User u WHERE u.email = :email", User.class)
+                   .setParameter("email", email)
+                   .getSingleResult();
+       } catch (NoResultException ex){
+           return null;
+       }
     }
 
-    @TransactionAttribute(TransactionAttributeType.REQUIRED)
     public User changeUserPassword(String email, String password){
         User u = findUserByEmail(email);
         u.setPassword(PasswordUtils.encryptPassword(password));
-        saveOrUpdate(u);
         return u;
     }
 

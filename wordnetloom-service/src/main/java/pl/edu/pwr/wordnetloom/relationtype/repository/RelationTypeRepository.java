@@ -7,11 +7,9 @@ import pl.edu.pwr.wordnetloom.relationtype.model.RelationType;
 import javax.ejb.Stateless;
 import javax.inject.Inject;
 import javax.persistence.EntityManager;
+import javax.persistence.NoResultException;
 import javax.persistence.criteria.*;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 @Stateless
 public class RelationTypeRepository extends GenericRepository<RelationType> {
@@ -24,7 +22,7 @@ public class RelationTypeRepository extends GenericRepository<RelationType> {
     }
 
     public void deleteRelationWithChilds(RelationType relation) {
-        deleteAllChilds(relation);
+        deleteAllChildren(relation);
         delete(relation);
     }
 
@@ -34,7 +32,7 @@ public class RelationTypeRepository extends GenericRepository<RelationType> {
                 .getResultList();
     }
 
-    public void deleteAllChilds(RelationType relationType) {
+    public void deleteAllChildren(RelationType relationType) {
         getEntityManager().createQuery("DELETE FROM RelationType rt WHERE rt.parent = :parent")
                 .setParameter("parent", relationType)
                 .executeUpdate();
@@ -51,7 +49,6 @@ public class RelationTypeRepository extends GenericRepository<RelationType> {
         root.fetch("partsOfSpeech", JoinType.LEFT);
 
         q.distinct(true);
-
         return em.createQuery(q).getResultList();
 
     }
@@ -131,6 +128,16 @@ public class RelationTypeRepository extends GenericRepository<RelationType> {
                     .getSingleResult();
         }
         return null;
+    }
+
+    public RelationType findParent(Long childId) {
+        try {
+            return getEntityManager().createQuery("SELECT rt.parent FROM RelationType rt WHERE rt.id = :id", RelationType.class)
+                    .setParameter("id", childId)
+                    .getSingleResult();
+        } catch (NoResultException ex){
+            return null;
+        }
     }
 
     @Override

@@ -4,9 +4,7 @@ import pl.edu.pwr.wordnetloom.client.remote.RemoteConnectionProvider;
 import pl.edu.pwr.wordnetloom.client.remote.RemoteService;
 import pl.edu.pwr.wordnetloom.domain.model.Domain;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 public class DomainManager {
@@ -17,9 +15,7 @@ public class DomainManager {
 
     private DomainManager() {
         List<Domain> list = RemoteService.domainServiceRemote.findAll();
-//        cache = new ArrayList<>();
         cache = list;
-//        Collections.unmodifiableList(Collections.synchronizedList(list));
     }
 
     public static DomainManager getInstance() {
@@ -60,8 +56,8 @@ public class DomainManager {
         return sortDomains(getAllDomains());
     }
 
-    public List<Domain> sortDomains(List<Domain> doaminsToSort) {
-        List<Domain> toReturn = Arrays.asList(doaminsToSort.toArray(new Domain[]{}));
+    public List<Domain> sortDomains(List<Domain> domainsToSort) {
+        List<Domain> toReturn = Arrays.asList(domainsToSort.toArray(new Domain[]{}));
         String lang = RemoteConnectionProvider.getInstance().getLanguage();
         // toReturn.sort(Comparator.comparing(a -> a.getName(lang)));
         return toReturn;
@@ -99,7 +95,7 @@ public class DomainManager {
         Arrays.fill(toReturn, cache.get(0));
 
         cache.stream().forEach((d) -> {
-            toReturn[(int) (d.getId() + 0)] = d;
+            toReturn[Math.toIntExact(d.getId())] = d;
         });
 
         return toReturn;

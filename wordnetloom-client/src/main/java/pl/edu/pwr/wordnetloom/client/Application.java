@@ -27,7 +27,7 @@ public class Application implements Loggable {
 
     public static final EventBus eventBus = new EventBus();
 
-    public static void main(String[] args) {
+    public static void main(String...args) {
 
         WebLookAndFeel.install();
         IconFontSwing.register(FontAwesome.getIconFont());
@@ -51,7 +51,6 @@ public class Application implements Loggable {
         try {
 
             Workbench workbench = new PanelWorkbench(PROGRAM_NAME_VERSION);
-            workbench.refreshUserBar(RemoteConnectionProvider.getInstance().getUser());
             workbench.setVisible(true);
 
         } catch (Exception ex) {
@@ -69,7 +68,7 @@ public class Application implements Loggable {
             DomainManager.getInstance();
             List<RelationType> relations = RemoteService.relationTypeRemote.findAll();
             RelationTypeManager.getInstance().load(relations);
-
+           // DictionaryManager.getInstance();
             start();
         }, "Mangers Thread");
 
@@ -80,6 +79,7 @@ public class Application implements Loggable {
             public void uncaughtException(Thread t, Throwable tt) {
                 if (first) {
                     SwingUtilities.invokeLater(() -> {
+                        tt.printStackTrace();
                         JOptionPane.showMessageDialog(null,
                                 Messages.ERROR_UNABLE_TO_CONNECT_TO_SERVER,
                                 Application.PROGRAM_NAME_VERSION,

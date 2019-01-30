@@ -38,7 +38,7 @@ public class SimpleListenerWrapper implements SimpleListenerInterface, Loggable 
     public SimpleListenerWrapper(Object owner, String methodName) {
         this.owner = owner;
         try {
-            method = owner.getClass().getMethod(methodName, new Class[]{Object.class, Integer.class});
+            method = owner.getClass().getMethod(methodName, Object.class, Integer.class);
         } catch (NoSuchMethodException | SecurityException e) {
             logger().error("Trying to call method", e);
         }
@@ -49,7 +49,9 @@ public class SimpleListenerWrapper implements SimpleListenerInterface, Loggable 
         try {
             args[0] = object;
             args[1] = tag;
-            method.invoke(owner, args); // wywołanie metody zastępczej
+            if(method != null){
+                method.invoke(owner, args); // wywołanie metody zastępczej
+            }
         } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
             logger().error("Trying to call doAction", e);
         }
