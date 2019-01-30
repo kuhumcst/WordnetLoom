@@ -4,10 +4,12 @@ import java.util.List;
 
 import pl.edu.pwr.wordnetloom.lexicon.model.Lexicon;
 import pl.edu.pwr.wordnetloom.partofspeech.model.PartOfSpeech;
+import pl.edu.pwr.wordnetloom.sense.model.EmotionalAnnotation;
 import pl.edu.pwr.wordnetloom.sense.model.Sense;
 import pl.edu.pwr.wordnetloom.sense.dto.SenseCriteriaDTO;
 import pl.edu.pwr.wordnetloom.sense.model.SenseAttributes;
 import pl.edu.pwr.wordnetloom.synset.model.Synset;
+import pl.edu.pwr.wordnetloom.word.model.Word;
 
 public interface SenseServiceRemote {
 
@@ -17,7 +19,11 @@ public interface SenseServiceRemote {
 
     SenseAttributes addSenseAttribute(final Long senseId, final SenseAttributes attributes);
 
+    List<SenseAttributes> findByLemmaWithSense(String lemma, List<Long> lexicons);
+
     void delete(Sense sense);
+
+    void delete(EmotionalAnnotation annotation);
 
     void deleteAll();
 
@@ -62,4 +68,12 @@ public interface SenseServiceRemote {
     Sense fetchSense(Long senseId);
 
     SenseAttributes fetchSenseAttribute(Long senseId);
+
+    List<EmotionalAnnotation> getEmotionalAnnotations(Long senseID);
+
+    EmotionalAnnotation save(EmotionalAnnotation annotation);
+
+    List<String> findUniqueExampleTypes();
+
+    Sense saveSense(SenseAttributes attributes, String oldLemma);
 }

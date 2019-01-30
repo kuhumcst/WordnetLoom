@@ -6,7 +6,6 @@ import org.junit.Test;
 import pl.edu.pwr.wordnetloom.commontests.utils.TestBaseRepository;
 import pl.edu.pwr.wordnetloom.lexicon.model.Lexicon;
 
-import java.util.Arrays;
 import java.util.List;
 
 import static org.hamcrest.CoreMatchers.*;
@@ -41,25 +40,6 @@ public class LexiconRepositoryUTest extends TestBaseRepository {
         Lexicon lexicon = lexiconRepository.findById(lexiconAddedId);
         assertThat(lexicon, is(notNullValue()));
         assertThat(lexicon.getName(), is(equalTo(princenton().getName())));
-    }
-
-    @Test
-    public void shouldFindLexiconByIdList() {
-
-        Long lexiconAddedId1 = dbCommandExecutor.executeCommand(() -> {
-            return lexiconRepository.persist(princenton()).getId();
-        });
-
-        Long lexiconAddedId2 = dbCommandExecutor.executeCommand(() -> {
-            return lexiconRepository.persist(slowosiec()).getId();
-        });
-
-        assertThat(lexiconAddedId1, is(notNullValue()));
-        assertThat(lexiconAddedId2, is(notNullValue()));
-
-        List<Lexicon> list = lexiconRepository.findByLexicons(Arrays.asList(lexiconAddedId1, lexiconAddedId2));
-
-        assertThat(list.size(), equalTo(2));
     }
 
     @Test

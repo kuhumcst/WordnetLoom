@@ -1,27 +1,35 @@
 package pl.edu.pwr.wordnetloom.synset.service.impl;
 
+import org.hibernate.Hibernate;
 import org.jboss.ejb3.annotation.SecurityDomain;
 import pl.edu.pwr.wordnetloom.common.dto.DataEntry;
 import pl.edu.pwr.wordnetloom.common.model.NodeDirection;
 import pl.edu.pwr.wordnetloom.common.utils.ValidationUtils;
+import pl.edu.pwr.wordnetloom.dictionary.repository.DictionaryRepository;
 import pl.edu.pwr.wordnetloom.relationtype.model.RelationType;
 import pl.edu.pwr.wordnetloom.sense.model.Sense;
+import pl.edu.pwr.wordnetloom.sense.repository.SenseAttributesRepository;
 import pl.edu.pwr.wordnetloom.sense.service.SenseServiceLocal;
 import pl.edu.pwr.wordnetloom.synset.dto.SynsetCriteriaDTO;
+import pl.edu.pwr.wordnetloom.synset.exception.InvalidLexiconException;
+import pl.edu.pwr.wordnetloom.synset.exception.InvalidPartOfSpeechException;
 import pl.edu.pwr.wordnetloom.synset.model.Synset;
 import pl.edu.pwr.wordnetloom.synset.model.SynsetAttributes;
+import pl.edu.pwr.wordnetloom.synset.model.SynsetExample;
 import pl.edu.pwr.wordnetloom.synset.repository.SynsetAttributesRepository;
 import pl.edu.pwr.wordnetloom.synset.repository.SynsetRepository;
 import pl.edu.pwr.wordnetloom.synset.service.SynsetServiceLocal;
 import pl.edu.pwr.wordnetloom.synset.service.SynsetServiceRemote;
+import pl.edu.pwr.wordnetloom.synsetrelation.model.SynsetRelation;
+import pl.edu.pwr.wordnetloom.synsetrelation.repository.SynsetRelationRepository;
 import pl.edu.pwr.wordnetloom.user.model.User;
 import pl.edu.pwr.wordnetloom.user.service.UserServiceLocal;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
-import javax.annotation.Resource;
+
 import javax.annotation.security.DeclareRoles;
 import javax.annotation.security.PermitAll;
 import javax.annotation.security.RolesAllowed;
-import javax.ejb.EJBContext;
 import javax.ejb.Local;
 import javax.ejb.Remote;
 import javax.ejb.Stateless;
@@ -29,8 +37,10 @@ import javax.inject.Inject;
 import javax.validation.Validator;
 import java.security.Principal;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 @Stateless
 @SecurityDomain("wordnetloom")
@@ -46,10 +56,19 @@ public class SynsetServiceBean implements SynsetServiceLocal {
     SynsetAttributesRepository synsetAttributesRepository;
 
     @Inject
+    SynsetRelationRepository synsetRelationRepository;
+
+    @Inject
     SenseServiceLocal senseService;
 
     @Inject
     UserServiceLocal userService;
+
+    @Inject
+    DictionaryRepository dictionaryRepository;
+
+    @Inject
+    SenseAttributesRepository senseAttributesRepository;
 
     @Inject
     Principal principal;
@@ -65,6 +84,7 @@ public class SynsetServiceBean implements SynsetServiceLocal {
     @RolesAllowed({"USER", "ADMIN"})
     @Override
     public boolean delete(Synset synset) {
+        synsetAttributesRepository.delete(synset.getId());
         synsetRepository.delete(synset);
         return true;
     }
@@ -72,7 +92,9 @@ public class SynsetServiceBean implements SynsetServiceLocal {
     @PermitAll
     @Override
     public Synset findSynsetBySense(Sense sense, List<Long> lexicons) {
-        return synsetRepository.findSynsetBySense(sense, lexicons);
+        Synset synset = synsetRepository.findSynsetBySense(sense, lexicons);
+        Hibernate.initialize(synset.getLexicon());
+        return synset;
     }
 
     @PermitAll
@@ -103,9 +125,18 @@ public class SynsetServiceBean implements SynsetServiceLocal {
     public Synset save(Synset synset) {
         ValidationUtils.validateEntityFields(validator, synset);
         if (synset.getId() == null) {
-            return synsetRepository.persist(synset);
+            Synset newSynset = synsetRepository.persist(synset);
+            newSynset.setStatus(dictionaryRepository.findStatusDefaultValue());
+            saveAttributes(newSynset);
         }
         return synsetRepository.update(synset);
+    }
+
+    private void saveAttributes(Synset newSynset) {
+        SynsetAttributes attributes = new SynsetAttributes();
+        attributes.setSynset(newSynset);
+        attributes.setId(newSynset.getId());
+        synsetAttributesRepository.persist(attributes);
     }
 
     @RolesAllowed({"USER", "ADMIN"})
@@ -136,39 +167,54 @@ public class SynsetServiceBean implements SynsetServiceLocal {
     @PermitAll
     @Override
     public Map<Long, DataEntry> prepareCacheForRootNode(Synset synset, List<Long> lexicons, NodeDirection[] directions) {
-        return synsetRepository.prepareCacheForRootNode(synset.getId(), lexicons, 4, directions);
+        try {
+            return synsetRepository.prepareCacheForRootNode(synset.getId(), lexicons, 4, directions);
+        } catch (ExecutionException | InterruptedException e) {
+            e.printStackTrace();
+        }
+        return new HashMap<>();
     }
 
     @RolesAllowed({"USER", "ADMIN"})
     @Override
-    public Synset addSenseToSynset(Sense sense, Synset synset) {
+    public Synset addSenseToSynset(Sense sense, Synset synset) throws InvalidLexiconException, InvalidPartOfSpeechException {
 
         Synset saved = synset;
 
         if (synset.getId() == null) {
-
             saved = save(synset);
-
-            SynsetAttributes synsetAttributes = new SynsetAttributes();
-            String email = principal.getName();
-            User user = userService.findUserByEmail(email);
-            synsetAttributes.setOwner(user);
-            synsetAttributes.setSynset(saved);
-            save(synsetAttributes);
-
+            saveOwner(saved);
         }
-
+        Sense fetchedSense = senseService.fetchSense(sense.getId());
         List<Sense> sensesInSynset = senseService.findBySynset(synset.getId());
+        sensesInSynset.stream()
+                .findFirst()
+                .ifPresent(s -> {
+                    if(!fetchedSense.getPartOfSpeech().equals(s.getPartOfSpeech())){
+                        throw new InvalidPartOfSpeechException();
+                    }
+                    if(!fetchedSense.getLexicon().equals(s.getLexicon())){
+                        throw new InvalidLexiconException();
+                    }
+                });
 
         if (sensesInSynset.contains(sense)) {
             return saved;
         }
 
-        sense.setSynset(saved);
-        sense.setSynsetPosition(sensesInSynset.size());
-        senseService.save(sense);
+        fetchedSense.setSynset(saved);
+        fetchedSense.setSynsetPosition(sensesInSynset.size());
+        senseService.save(fetchedSense);
 
         return saved;
+    }
+
+    private void saveOwner(Synset saved) {
+        SynsetAttributes attributes = synsetAttributesRepository.findById(saved.getId());
+        String email = principal.getName();
+        User user = userService.findUserByEmail(email);
+        attributes.setOwner(user);
+        save(attributes);
     }
 
     private int reindexSensesInSynset(Synset synset) {
@@ -186,6 +232,7 @@ public class SynsetServiceBean implements SynsetServiceLocal {
     @Override
     public void deleteSensesFromSynset(Collection<Sense> senses, Synset synset) {
         for (Sense sense : senses) {
+            sense = senseService.fetchSense(sense.getId());
             sense.setSynset(null);
             sense.setSynsetPosition(null);
             senseService.save(sense);
@@ -215,5 +262,61 @@ public class SynsetServiceBean implements SynsetServiceLocal {
     @Override
     public SynsetAttributes fetchSynsetAttributes(Long synsetId) {
         return synsetRepository.fetchSynsetAttributes(synsetId);
+    }
+
+    @RolesAllowed({"USER", "ADMIN"})
+    @Override
+    public void merge(Synset target, Synset source){
+        moveSenses(target, source);
+        moveRelations(target, source);
+        delete(source);
+    }
+
+    private void moveRelations(Synset target, Synset source) {
+        List<SynsetRelation> sourceRelations = synsetRelationRepository.findRelations(source);
+        for(SynsetRelation relation : sourceRelations){
+            RelationType relationType = relation.getRelationType();
+            if(source == relation.getParent()){
+                Synset child = relation.getChild();
+                if(!synsetRelationRepository.checkRelationExists(target, child, relationType)){
+                    synsetRelationRepository.create(target, child, relationType);
+                }
+            } else { //source == relation.getChild()
+                Synset parent = relation.getParent();
+                if (!synsetRelationRepository.checkRelationExists(parent, target, relationType)) {
+                    synsetRelationRepository.create(parent, target, relationType);
+                }
+            }
+            synsetRelationRepository.delete(relation);
+        }
+    }
+
+    private void moveSenses(Synset target, Synset source) {
+        List<Sense> sourceSenses = senseService.findBySynset(source.getId());
+        int sensesInTarget = synsetRepository.findSynsetSenseCount(target);
+        int positionInSynset = sensesInTarget;
+        for(Sense sense : sourceSenses){
+            positionInSynset++;
+            sense.setSynset(target);
+            sense.setSynsetPosition(positionInSynset);
+            senseService.save(sense);
+        }
+    }
+
+
+    @RolesAllowed({"USER", "ADMIN"})
+    @Override
+    public  void remove(Synset synset) {
+        synsetAttributesRepository.delete(synset.getId());
+        synsetRelationRepository.deleteConnection(synset);
+        List<Sense> senses = senseService.findBySynset(synset.getId());
+        removeSenses(senses);
+        synsetRepository.delete(synset);
+    }
+
+    private void removeSenses(List<Sense> senses){
+        for(Sense sense : senses) {
+            senseService.delete(sense);
+        }
     }
 }

@@ -1,7 +1,3 @@
-# utowrzenie indeksu na tabeli word
-CREATE INDEX word_index
-  ON wordnet.word (word);
-
 ALTER TABLE wordnet_work.lexicalunit
   CONVERT TO CHARACTER SET utf8
   COLLATE utf8_polish_ci;
@@ -19,7 +15,7 @@ ALTER TABLE wordnet_work.relationtype
 
 #przeniesienie słów. m^2 oraz m^3 nalezy dodać odzielnie, ponieważ DISTINCT traktuje m^2 tak samo jak M2 i wstawia tylko jedną z tych wartości
 INSERT INTO wordnet.word (word)
-  SELECT DISTINCT lemma COLLATE utf8_polish_ci
+  SELECT DISTINCT CAST(BINARY lemma AS CHAR CHARACTER SET utf8) COLLATE utf8_bin
   FROM wordnet_work.lexicalunit
   UNION ALL
   SELECT 'm²'
@@ -61,14 +57,14 @@ CREATE PROCEDURE insert_dictionaries(IN valuesList VARCHAR(1000), IN typeName VA
             VALUES (@lastInsertedStringId, @value, 'en');
 
             IF(@optionalValue IS NOT NULL) THEN
-                IF(typeName = 'MarkednessDictionary') THEN
+                IF(typeName = 'Markedness') THEN
                     INSERT INTO wordnet.application_localised_string(value, language)
                     VALUES (@optionalValue, 'pl');
                     SET @lastInsertedValueId = LAST_INSERT_ID();
                     INSERT INTO wordnet.application_localised_string(id, value, language)
                     VALUES (@lastInsertedValueId, @optionalValue, 'en');
                 END IF;
-                IF (typeName = 'AspectDictionary') THEN
+                IF (typeName = 'Aspect') THEN
                     SET @tag = @optionalValue;
 				END IF;
 			END IF;
@@ -80,12 +76,12 @@ CREATE PROCEDURE insert_dictionaries(IN valuesList VARCHAR(1000), IN typeName VA
         END WHILE;
     END $$
 DELIMITER ;
-CALL insert_dictionaries('og.,daw.,książk.,nienorm.,posp.,pot.,reg.,specj.,środ.,urz.,wulg.,', 'RegisterDictionary');
-CALL insert_dictionaries('Nieprzetworzony,Nowy,Błąd,Sprawdzony,Znaczenie,Częściowo przetworzony,', 'StatusDictionary');
-CALL insert_dictionaries('radość,zaufanie,cieszenie się na coś oczekiwanego, zaskoczenie czymś nieprzewidywanym, smutek, złość, strach, wstręt,', 'EmotionDictionary');
-CALL insert_dictionaries('użyteczność, dobro, prawda, wiedza, piękno, szczęście, nieużyteczność, krzywda, niewiedza, błąd, brzydota, nieszczęście,', 'ValuationDictionary');
-CALL insert_dictionaries('Wybierz:, amb (niejednoznaczność pod względem nacechowania emocjonalnego;amb,+ m (mocne nacechowanie pozytywne jednostki);+ m, - m (mocne nacechowanie negatywne jednostki);- m,+ s (słabe nacechowanie pozytywne jednostki);+ s,- s (słabe nacechowanie negatywne jednostki);- s,', 'MarkednessDictionary');
-CALL insert_dictionaries('jednostka nie jest czasownikiem;no,aspect dokonany;:perf:,aspekt niedokonany;:imperf:,predykatyw;:pred:,czasownik dwuaspektowy;:imperf.perf;,', 'AspectDictionary');
+CALL insert_dictionaries('og.,daw.,książk.,nienorm.,posp.,pot.,reg.,specj.,środ.,urz.,wulg.,', 'Register');
+CALL insert_dictionaries('Nieprzetworzony,Nowy,Błąd,Sprawdzony,Znaczenie,Częściowo przetworzony,', 'Status');
+CALL insert_dictionaries('radość,zaufanie,cieszenie się na coś oczekiwanego, zaskoczenie czymś nieprzewidywanym, smutek, złość, strach, wstręt,', 'Emotion');
+CALL insert_dictionaries('użyteczność, dobro, prawda, wiedza, piękno, szczęście, nieużyteczność, krzywda, niewiedza, błąd, brzydota, nieszczęście,', 'Valuation');
+CALL insert_dictionaries('Wybierz:, amb (niejednoznaczność pod względem nacechowania emocjonalnego;amb,+ m (mocne nacechowanie pozytywne jednostki);+ m, - m (mocne nacechowanie negatywne jednostki);- m,+ s (słabe nacechowanie pozytywne jednostki);+ s,- s (słabe nacechowanie negatywne jednostki);- s,', 'Markedness');
+CALL insert_dictionaries('jednostka nie jest czasownikiem;no,aspect dokonany;:perf:,aspekt niedokonany;:imperf:,predykatyw;:pred:,czasownik dwuaspektowy;:imperf.perf;,', 'Aspect');
 
 DROP PROCEDURE IF EXISTS insert_localised_description;
 
@@ -109,10 +105,21 @@ INSERT INTO wordnet.synset (id, split,abstract, lexicon_id, status_id)
        LEFT JOIN wordnet_work.synset SS ON U.SYN_ID = SS.id
      WHERE SS.id = S.id
      LIMIT 1) AS lexicon,
-     (SELECT id FROM wordnet.temp_dictionaries WHERE old_value = S.status AND dtype = 'StatusDictionary')
+     (SELECT id FROM wordnet.temp_dictionaries WHERE old_value = S.status AND dtype = 'Status')
   FROM wordnet_work.synset S LEFT JOIN wordnet_work.unitandsynset U ON S.id = U.SYN_ID
     LEFT JOIN wordnet_work.lexicalunit L ON U.LEX_ID = L.id
   WHERE U.SYN_ID IS NOT NULL AND L.id IS NOT NULL;
+
+CREATE TABLE tempWord(
+	id INT PRIMARY KEY,
+    bin BLOB, INDEX(bin(255)),
+    word TEXT
+);
+
+INSERT INTO tempWord(id, bin, word)
+SELECT DISTINCT id, BINARY TRIM(TRAILING FROM word), word
+FROM word;
+
 
 # przerzucenie jednostek
 INSERT INTO wordnet.sense (id, synset_position, variant, domain_id, lexicon_id, part_of_speech_id, synset_id, word_id, status_id)
@@ -130,13 +137,15 @@ INSERT INTO wordnet.sense (id, synset_position, variant, domain_id, lexicon_id, 
       THEN pos
     ELSE pos - 4 END AS part_of_speech,
     S.id             AS synset_id,
-    (SELECT id
-     FROM wordnet.word
-     WHERE word = L.lemma
+    (SELECT W.id
+     FROM tempWord W
+      WHERE W.bin = BINARY (TRIM(TRAILING FROM L.lemma))
      LIMIT 1)        AS word_id,
-     (SELECT id FROM wordnet.temp_dictionaries WHERE old_value = L.status AND dtype = 'StatusDictionary') AS status
+      (SELECT id FROM wordnet.temp_dictionaries WHERE old_value = L.status AND dtype = 'Status') AS status
   FROM wordnet_work.lexicalunit L LEFT JOIN wordnet_work.unitandsynset U ON L.id = U.LEX_ID
     LEFT JOIN wordnet_work.synset S ON U.SYN_ID = S.id;
+
+DROP TABLE tempWord;
 
 # changing synset position in english lexicons
 UPDATE sense
@@ -147,27 +156,45 @@ UPDATE sense
 SET synset_position = 0
 WHERE synset_position < 0;
 
+CREATE TABLE tempSynsetPos(
+  id INT PRIMARY KEY,
+  pos INT
+);
+
+INSERT INTO tempSynsetPos(id, pos)
+  SELECT s.synset_id, min(s.synset_position) FROM wordnet.sense s
+  GROUP BY s.synset_id
+  HAVING min(s.synset_position) <> 0;
+
+UPDATE sense s
+  LEFT JOIN tempSynsetPos tmp on s.synset_id = tmp.id
+SET s.synset_position = s.synset_position - tmp.pos
+WHERE s.synset_id = tmp.id;
+
+DROP TABLE tempSynsetPos;
+# ------------------------------------------
+
 # PRZERZUCANIE UŻYTKOWNIKÓW
 #podział na imię i nazwisko
 SELECT DISTINCT
-  SUBSTRING_INDEX(TRIM(owner), '.', 1),
-  SUBSTRING_INDEX(TRIM(owner), '.', -1)
+  SUBSTRING_INDEX(TRIM(LOWER(owner)), '.', 1),
+  SUBSTRING_INDEX(TRIM(LOWER(owner)), '.', -1)
 FROM wordnet_work.lexicalunit;
 
 # dodanie użytkowników. Użytkownicy wymagają czyszczenia
 INSERT INTO wordnet.users (email, firstname, lastname, password)
   SELECT DISTINCT
     ''                                                            AS email,
-    SUBSTRING_INDEX(TRIM(owner), '.', 1) COLLATE utf8_general_ci  AS firstname,
-    SUBSTRING_INDEX(TRIM(owner), '.', -1) COLLATE utf8_general_ci AS lastname,
+    SUBSTRING_INDEX(LOWER(TRIM(owner)), '.', 1) COLLATE utf8_general_ci  AS firstname,
+    SUBSTRING_INDEX(LOWER(TRIM(owner)), '.', -1) COLLATE utf8_general_ci AS lastname,
     ''                                                            AS password
   FROM wordnet_work.lexicalunit
   HAVING firstname != '' AND lastname != ''
   UNION DISTINCT
   SELECT DISTINCT
     ''                                                            AS email,
-    SUBSTRING_INDEX(TRIM(owner), '.', 1) COLLATE utf8_general_ci  AS firstname,
-    SUBSTRING_INDEX(TRIM(owner), '.', -1) COLLATE utf8_general_ci AS lastname,
+    SUBSTRING_INDEX(LOWER(TRIM(owner)), '.', 1) COLLATE utf8_general_ci  AS firstname,
+    SUBSTRING_INDEX(LOWER(TRIM(owner)), '.', -1) COLLATE utf8_general_ci AS lastname,
     ''                                                            AS password
   FROM wordnet_work.synset
   HAVING firstname != '' AND lastname != '';
@@ -180,8 +207,8 @@ INSERT INTO wordnet.sense_attributes (sense_id, comment, user_id, error_comment)
     (SELECT id
      FROM wordnet.users
      WHERE
-       SUBSTRING_INDEX(TRIM(L.owner), '.', 1) = firstname AND
-       SUBSTRING_INDEX(TRIM(L.owner), '.', -1) = lastname) AS user,
+       SUBSTRING_INDEX(TRIM(LOWER(L.owner)), '.', 1) = firstname AND
+       SUBSTRING_INDEX(TRIM(LOWER(L.owner)), '.', -1) = lastname) AS user,
     error_comment
   FROM wordnet_work.lexicalunit L
   WHERE comment != '' AND comment IS NOT NULL;
@@ -196,8 +223,8 @@ INSERT INTO wordnet.synset_attributes (synset_id, comment, definition, owner_id,
     (SELECT id
      FROM wordnet.users
      WHERE
-       SUBSTRING_INDEX(TRIM(S.owner), '.', 1) = firstname AND
-       SUBSTRING_INDEX(TRIM(S.owner), '.', -1) = lastname
+       SUBSTRING_INDEX(TRIM(LOWER(S.owner)), '.', 1) = firstname AND
+       SUBSTRING_INDEX(TRIM(LOWER(S.owner)), '.', -1) = lastname
      LIMIT 1) AS user,
     error_comment
   FROM wordnet_work.synset S
@@ -346,43 +373,6 @@ DELIMITER ;
 CALL insertAllowedLexicons();
 
 DROP PROCEDURE IF EXISTS insertAllowedLexicons;
-
-# dodanie i wypełnienie tabeli register_types. Tabela będzie potrzebna do parsowania komentarzy
---CREATE TABLE wordnet.register_types
---(
---  id      INT PRIMARY KEY AUTO_INCREMENT,
---  name_id BIGINT NOT NULL UNIQUE
---);
-
---ALTER TABLE wordnet.register_types
---  ADD CONSTRAINT fk_register_types_localised
---FOREIGN KEY (name_id) REFERENCES wordnet.application_localised_string (id);
-
---DELIMITER $$
---DROP PROCEDURE IF EXISTS insert_register_types$$
---CREATE PROCEDURE insert_register_types()
---
---  BEGIN
---    SET @registers = 'og.,daw.,książk.,nienorm.,posp.,pot.,reg.,specj.,środ.,urz.,wulg.,';
---    WHILE (LOCATE(',', @registers) > 0) DO
---      SET @value = SUBSTRING(@registers, 1, LOCATE(',', @registers) - 1);
---      SET @last_insert_id = LAST_INSERT_ID();
---      INSERT INTO wordnet.application_localised_string (value, language)
---      VALUES (@value, 'pl');
---      SET @last_insert_id = LAST_INSERT_ID();
---      INSERT INTO wordnet.application_localised_string (id, value, language)
---      VALUES (@last_insert_id, @value, 'en');
---      INSERT INTO wordnet.register_types (name_id)
---      VALUES (@last_insert_id);
---      SET @registers = SUBSTRING(@registers, LOCATE(',', @registers) + 1);
---    END WHILE;
---  END $$
---
---DELIMITER ;
---
---CALL insert_register_types;
---
---DROP PROCEDURE insert_register_types;
 
 # dodanie kolumny proper_name, do atrybutów jednostek
 ALTER TABLE wordnet.sense_attributes

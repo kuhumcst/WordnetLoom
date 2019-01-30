@@ -1,10 +1,12 @@
 package pl.edu.pwr.wordnetloom.lexicon.model;
 
 import org.hibernate.envers.Audited;
+import org.hibernate.validator.constraints.Email;
 import pl.edu.pwr.wordnetloom.common.model.GenericEntity;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.Lob;
 import javax.persistence.Table;
 import javax.validation.constraints.NotNull;
 import java.util.Objects;
@@ -26,8 +28,29 @@ public class Lexicon extends GenericEntity {
     @Column(name = "language_name")
     private String languageName;
 
+    @Column(name = "language_shortcut")
+    private String languageShortcut;
+
     @Column(name = "lexicon_version")
     private String lexiconVersion;
+
+    private String license;
+
+    @Email
+    private String email;
+
+    @Column(name = "reference_url")
+    private String referenceUrl;
+
+    @Lob
+    private String citation;
+
+    @Column(name = "confidence_score")
+    private String confidenceScore;
+
+    private String description;
+
+    private boolean onlyToRead;
 
     public Lexicon() {
     }
@@ -70,6 +93,74 @@ public class Lexicon extends GenericEntity {
         this.lexiconVersion = lexiconVersion;
     }
 
+    public static long getSerialVersionUID() {
+        return serialVersionUID;
+    }
+
+    public String getLanguageShortcut() {
+        return languageShortcut;
+    }
+
+    public void setLanguageShortcut(String languageShortcut) {
+        this.languageShortcut = languageShortcut;
+    }
+
+    public String getLicense() {
+        return license;
+    }
+
+    public void setLicense(String license) {
+        this.license = license;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getReferenceUrl() {
+        return referenceUrl;
+    }
+
+    public void setReferenceUrl(String referenceUrl) {
+        this.referenceUrl = referenceUrl;
+    }
+
+    public String getCitation() {
+        return citation;
+    }
+
+    public void setCitation(String citation) {
+        this.citation = citation;
+    }
+
+    public String getConfidenceScore() {
+        return confidenceScore;
+    }
+
+    public void setConfidenceScore(String confidenceScore) {
+        this.confidenceScore = confidenceScore;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description){
+        this.description = description;
+    }
+
+    public boolean isOnlyToRead() {
+        return onlyToRead;
+    }
+
+    public void setOnlyToRead(boolean onlyToRead){
+        this.onlyToRead = onlyToRead;
+    }
+
     @Override
     public int hashCode() {
         int hash = 7;
@@ -92,8 +183,11 @@ public class Lexicon extends GenericEntity {
         return Objects.equals(id, other.id);
     }
 
+
     @Override
     public String toString() {
         return name;
     }
+
+
 }

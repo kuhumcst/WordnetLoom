@@ -1,13 +1,11 @@
 package pl.edu.pwr.wordnetloom.synsetrelation.repository;
 
-import edu.uci.ics.jung.algorithms.shortestpath.DijkstraShortestPath;
 import edu.uci.ics.jung.graph.DirectedGraph;
 import edu.uci.ics.jung.graph.DirectedSparseGraph;
+import pl.edu.pwr.wordnetloom.common.dto.DataEntry;
 import pl.edu.pwr.wordnetloom.common.model.NodeDirection;
 import pl.edu.pwr.wordnetloom.common.repository.GenericRepository;
 import pl.edu.pwr.wordnetloom.relationtype.model.RelationType;
-import pl.edu.pwr.wordnetloom.relationtype.repository.RelationTypeRepository;
-import pl.edu.pwr.wordnetloom.sense.model.Sense;
 import pl.edu.pwr.wordnetloom.synset.model.Synset;
 import pl.edu.pwr.wordnetloom.synsetrelation.model.SynsetRelation;
 
@@ -15,9 +13,7 @@ import javax.ejb.Stateless;
 import javax.inject.Inject;
 import javax.persistence.EntityManager;
 import javax.persistence.Query;
-import javax.persistence.criteria.*;
 import java.util.*;
-import java.util.Map.Entry;
 
 @Stateless
 public class SynsetRelationRepository extends GenericRepository<SynsetRelation> {
@@ -41,7 +37,6 @@ public class SynsetRelationRepository extends GenericRepository<SynsetRelation> 
     }
 
     public void delete(SynsetRelation relation){
-//        getEntityManager().remove(relation);
         em.remove(em.contains(relation) ? relation : em.merge(relation));
     }
 
@@ -131,9 +126,50 @@ public class SynsetRelationRepository extends GenericRepository<SynsetRelation> 
         return relations.get(0);
     }
 
-    public List<Synset> findTopPathInSynsets(Synset synset, Long rtype) {
-        ArrayList<Synset> path = new ArrayList<>();
+    public DirectedGraph<Long, SynsetRelation> findDirectedGraph(Synset synset, RelationType relationType){
+        return getRelationDirectedGraph(synset, relationType.getId());
+    }
 
+    public List<Synset> findPath(Synset synset, RelationType relationType){
+        DirectedGraph<Long, SynsetRelation> graph = getRelationDirectedGraph(synset, relationType.getId());
+        List<Synset> result = new ArrayList<>();
+        result.add(synset);
+        Deque<Synset> synsetDeque = new ArrayDeque<>();
+        synsetDeque.push(synset);
+        Synset currentSynset;
+        Synset childSynset;
+        DataEntry dataEntry;
+        Set<Long> downloadedSynsets = new HashSet<>();
+        while(!synsetDeque.isEmpty()) {
+            currentSynset = synsetDeque.pop();
+            Collection<SynsetRelation> relations = graph.getIncidentEdges(currentSynset.getId());
+            for(SynsetRelation relation : relations){
+                if(relation.getChild().getId().equals(currentSynset.getId())){
+                    continue;
+                }
+                childSynset = relation.getChild();
+                result.add(childSynset);
+                if(!downloadedSynsets.contains(childSynset.getId())){
+                    synsetDeque.push(childSynset);
+                }
+            }
+            downloadedSynsets.add(currentSynset.getId());
+        }
+        return result;
+    }
+
+    private Long getLastElement(Map<Long, Number> map) {
+        return map.entrySet().stream().skip(map.size()-1).findFirst().get().getKey();
+    }
+
+    private List<SynsetRelation> findSynsetRelation(Long parentId, Long relationTypeId) {
+        return getEntityManager().createQuery("SELECT s FROM SynsetRelation s  LEFT JOIN FETCH s.parent WHERE (s.parent.id = :id_s) AND s.relationType.id = :id_r")
+                .setParameter("id_s", parentId)
+                .setParameter("id_r", relationTypeId)
+                .getResultList();
+    }
+
+    private DirectedGraph<Long, SynsetRelation> getRelationDirectedGraph(Synset synset, Long rtype) {
         DirectedGraph<Long, SynsetRelation> g = new DirectedSparseGraph<>();
 
         g.addVertex(synset.getId());
@@ -145,36 +181,14 @@ public class SynsetRelationRepository extends GenericRepository<SynsetRelation> 
             item = stack.pop();
             relations = findSynsetRelation(item, rtype);
             for (SynsetRelation rel : relations) {
+                // TODO przemyśleć to, aby pobierało wszystko
                 if (!g.containsVertex(rel.getChild().getId())) {
                     stack.push(rel.getChild().getId());
                     g.addEdge(rel, item, rel.getChild().getId());
                 }
             }
         }
-
-        DijkstraShortestPath<Long, SynsetRelation> dsp
-                = new DijkstraShortestPath<>(g);
-
-        Map<Long, Number> map = dsp.getDistanceMap(synset.getId());
-        Long last = new Long(-1);
-        for (Entry<Long, Number> p : map.entrySet()) {
-            last = p.getKey();
-        }
-
-        if (last != -1) {
-            List<SynsetRelation> p = dsp.getPath(synset.getId(), last);
-            for (SynsetRelation r : p) {
-                path.add(r.getParent());
-            }
-        }
-        return path;
-    }
-
-    private List<SynsetRelation> findSynsetRelation(Long parentId, Long relationTypeId) {
-        return getEntityManager().createQuery("SELECT s FROM SynsetRelation s  LEFT JOIN FETCH s.parent WHERE (s.parent.id = :id_s) AND s.relationType.id = :id_r")
-                .setParameter("id_s", parentId)
-                .setParameter("id_r", relationTypeId)
-                .getResultList();
+        return g;
     }
 
     private List<SynsetRelation> getRelations(Synset synset, List<Long> lexicons, String joinColumn, String synsetIdColumn, NodeDirection[] directions) {
@@ -255,11 +269,18 @@ public class SynsetRelationRepository extends GenericRepository<SynsetRelation> 
      * @return wszystkie relację podanego synsetu
      */
     public List<SynsetRelation> findRelations(Synset synset) {
-        return getEntityManager().createQuery("SELECT sr.FROM SynsetRelation WHERE sr.parent.id =:id OR sr.child.id =:id", SynsetRelation.class)
+        return getEntityManager().createQuery("SELECT sr FROM SynsetRelation sr WHERE sr.parent.id =:id OR sr.child.id =:id", SynsetRelation.class)
                 .setParameter("id", synset.getId())
                 .getResultList();
     }
 
+    public void create(Synset parent, Synset child, RelationType relationType){
+        SynsetRelation relation = new SynsetRelation();
+        relation.setParent(parent);
+        relation.setChild(child);
+        relation.setRelationType(relationType);
+        persist(relation);
+    }
 
     @Override
     protected Class<SynsetRelation> getPersistentClass() {

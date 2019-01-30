@@ -1,20 +1,15 @@
 package pl.edu.pwr.wordnetloom.localisation.repository;
 
-import pl.edu.pwr.wordnetloom.common.dto.DataEntry;
-import pl.edu.pwr.wordnetloom.common.dto.DataMap;
 import pl.edu.pwr.wordnetloom.common.repository.GenericRepository;
-import pl.edu.pwr.wordnetloom.dictionary.model.RegisterDictionary;
+import pl.edu.pwr.wordnetloom.dictionary.model.Register;
+import pl.edu.pwr.wordnetloom.localisation.model.ApplicationLabel;
 import pl.edu.pwr.wordnetloom.localisation.model.LocalisedKey;
 import pl.edu.pwr.wordnetloom.localisation.model.LocalisedString;
-import pl.edu.pwr.wordnetloom.localisation.model.RegisterType;
 
 import javax.ejb.Stateless;
 import javax.inject.Inject;
 import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
-import javax.persistence.criteria.CriteriaBuilder;
-import javax.persistence.criteria.CriteriaQuery;
-import javax.persistence.criteria.Root;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,13 +20,10 @@ public class LocalisedStringRepository extends GenericRepository<LocalisedString
     @Inject
     EntityManager em;
 
-    public Map<String, String> findAllLabels(String locale) {
-        Map<String, String> map = new HashMap<>();
-
-        final List<Object[]> list = em.createNativeQuery("SELECT label_key, value FROM application_labels WHERE language = :locale")
-                .setParameter("locale", locale).getResultList();
-        list.forEach(i -> map.put(i[0].toString(), i[1].toString()));
-        return map;
+    public List<ApplicationLabel> findAllLabels(String locale) {
+        return em.createQuery("FROM ApplicationLabel a WHERE a.language=:language")
+                .setParameter("language", locale)
+                .getResultList();
     }
 
     public LocalisedString findByKey(LocalisedKey key) {
@@ -53,6 +45,23 @@ public class LocalisedStringRepository extends GenericRepository<LocalisedString
         return map;
     }
 
+    public Map<String, Map<Long, String>> findAll() {
+
+        final List<LocalisedString> list = em.createQuery("SELECT s FROM  LocalisedString s", LocalisedString.class)
+                .getResultList();
+
+        Map<String, Map<Long, String>> map = new HashMap<>();
+
+        list.forEach(i -> {
+            String locale = i.getKey().getLanguage();
+            if (!map.containsKey(locale)) {
+                map.put(i.getKey().getLanguage(), new HashMap<>());
+            }
+             map.get(locale).put(i.getKey().getId(), i.getValue());
+        });
+        return map;
+    }
+
     private Long findNextId() {
         Long next = (Long) em.createQuery("SELECT max(s.key.id) FROM LocalisedString s")
                 .getSingleResult();
@@ -67,35 +76,58 @@ public class LocalisedStringRepository extends GenericRepository<LocalisedString
                 .getResultList().size() > 0;
     }
 
-    public Map<Long, String> findAllRegisterTypes(String language)
-    {
-//        List<DataMap> list;
-//        list =  getEntityManager().createQuery("SELECT new DataMap(t.id, name.value) FROM RegisterType t JOIN t.name AS name WHERE t.language = :lang")
-//                .setParameter("lang", language)
-//                .getResultList();
-//        Map<Long, String> resultMap = new HashMap<>();
-//        list.forEach(e->resultMap.put(e.getId(), e.getText()));
-//        return resultMap;
-        //TODO zlikwidować native query
-
-
-//        List<Object[]> list;
-//        list = getEntityManager().createNativeQuery("SELECT T.id, L.value FROM register_types T JOIN application_localised_string L ON T.name_id = L.id WHERE language = :lang")
-//                .setParameter("lang", language)
-//                .getResultList();
-//        Map<Long, String> resultMap = new HashMap<>();
-//        for(Object[] entry : list)
-//        {
-//            resultMap.put(Long.valueOf((Integer)entry[0]), String.valueOf(entry[1]));
-//        }
-//        return resultMap;
-
-        List<RegisterDictionary> list = getEntityManager().createQuery("FROM RegisterDictionary").getResultList();
+    public Map<Long, String> findAllRegisterTypes(String language) {
+        List<Register> list = getEntityManager().createQuery("FROM Register").getResultList();
         Map<Long, String> resultMap = new HashMap<>();
-        for(RegisterDictionary register : list){
+        for (Register register : list) {
             resultMap.put(register.getId(), String.valueOf(register.getName())); //TODO zmienić tekst
         }
         return resultMap;
+    }
+
+    public List<ApplicationLabel> findStringsByKey(String key){
+        return em.createQuery("FROM ApplicationLabel a WHERE a.key =:key")
+                .setParameter("key", key)
+                .getResultList();
+    }
+
+    public LocalisedString save(LocalisedString localisedString){
+        if(getEntityManager().contains(localisedString)){
+            getEntityManager().persist(localisedString);
+            return localisedString;
+        } else {
+            return getEntityManager().merge(localisedString);
+        }
+    }
+
+    public synchronized Long getNextIdValue() {
+        Long latestId = (Long) getEntityManager().createQuery("SELECT MAX(l.key.id) FROM  LocalisedString l").getSingleResult();
+        return latestId + 1;
+    }
+
+    public ApplicationLabel save(ApplicationLabel label){
+        if(em.contains(label)){
+            em.persist(label);
+            return label;
+        } else {
+            return em.merge(label);
+        }
+    }
+
+    public ApplicationLabel find(String key, String language){
+        return (ApplicationLabel) em.createQuery("FROM ApplicationLabel a WHERE a.key = :key AND a.language = :language")
+                .setParameter("key", key)
+                .setParameter("language", language)
+                .getSingleResult();
+    }
+
+    public void remove(ApplicationLabel label){
+        em.remove(label);
+    }
+
+    public void removeLocalisedString(Long id) {
+        getEntityManager().createQuery("DELETE FROM LocalisedString l WHERE l.key.id = :id")
+                .setParameter("id", id).executeUpdate();
     }
 
     @Override
@@ -106,7 +138,6 @@ public class LocalisedStringRepository extends GenericRepository<LocalisedString
         getEntityManager().persist(s);
         return s;
     }
-
 
     @Override
     protected Class<LocalisedString> getPersistentClass() {

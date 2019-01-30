@@ -17,7 +17,6 @@ or FITNESS FOR A PARTICULAR PURPOSE.
  */
 package pl.edu.pwr.wordnetloom.client.plugins.lexeditor.frames;
 
-import pl.edu.pwr.wordnetloom.client.plugins.lexeditor.da.LexicalDA;
 import pl.edu.pwr.wordnetloom.client.remote.RemoteService;
 import pl.edu.pwr.wordnetloom.client.systems.common.Pair;
 import pl.edu.pwr.wordnetloom.client.systems.common.ValueContainer;
@@ -27,8 +26,8 @@ import pl.edu.pwr.wordnetloom.client.utils.Labels;
 import pl.edu.pwr.wordnetloom.client.utils.Messages;
 import pl.edu.pwr.wordnetloom.client.workbench.interfaces.Workbench;
 import pl.edu.pwr.wordnetloom.partofspeech.model.PartOfSpeech;
-import pl.edu.pwr.wordnetloom.sense.model.Sense;
 import pl.edu.pwr.wordnetloom.sense.dto.SenseCriteriaDTO;
+import pl.edu.pwr.wordnetloom.sense.model.Sense;
 import pl.edu.pwr.wordnetloom.sense.model.SenseAttributes;
 
 import javax.swing.*;
@@ -36,7 +35,6 @@ import java.util.Collection;
 
 /**
  * klasa dostarczajace okno z lista jednostek leksykalnych
- *
  */
 public class UnitsListFrame extends AbstractListFrame<Sense, PartOfSpeech> {
 
@@ -62,7 +60,7 @@ public class UnitsListFrame extends AbstractListFrame<Sense, PartOfSpeech> {
     protected boolean verifySelectedElements() {
         if (filterObject != null) {
             for (Sense elem : selectedElements) {
-                if (LexicalDA.checkIfInAnySynset(elem)) {
+                if (elem.getSynset().getId() != null) {
                     DialogBox.showError(String.format(Messages.INFO_UNIT_ALREADY_ASSIGNED_TO_SYNSET, (elem).getWord()));
                     return false;
                 }
@@ -78,8 +76,9 @@ public class UnitsListFrame extends AbstractListFrame<Sense, PartOfSpeech> {
         } else {
             SenseCriteriaDTO dto = new SenseCriteriaDTO();
             dto.setLemma(filter);
-            if(pos != null){
-                dto.setPartOfSpeechId(pos.getId());
+            if (pos != null) {
+//                dto.setPartOfSpeechId(pos.getId());
+                dto.setPartOfSpeech(pos);
             }
             dto.setLexicons(LexiconManager.getInstance().getUserChosenLexiconsIds());
             return RemoteService.senseRemote.findByCriteria(dto);
@@ -89,15 +88,15 @@ public class UnitsListFrame extends AbstractListFrame<Sense, PartOfSpeech> {
 
     @Override
     protected void invokeNew() {
-
-        Pair<Sense, SenseAttributes> newUnit = NewLexicalUnitFrame.showModal(workbench, filterObject);
-        if (newUnit != null) {
-            Sense sense = RemoteService.senseRemote.save(newUnit.getA());
-            RemoteService.senseRemote.addSenseAttribute(sense.getId(), newUnit.getB());
-            filterEdit.setText(sense.getWord().getWord());
-            unitWasCreated = true;
-            refreshListModel();
-        }
+        LexicalUnitPropertiesFrame.showModal(workbench, null);
+//        Pair<Sense, SenseAttributes> newUnit = NewLexicalUnitFrame.showModal(workbench, filterObject);
+//        if (newUnit != null) {
+//            Sense sense = RemoteService.senseRemote.save(newUnit.getA());
+//            RemoteService.senseRemote.addSenseAttribute(sense.getId(), newUnit.getB());
+//            filterEdit.setText(sense.getWord().getWord());
+//            unitWasCreated = true;
+//            refreshListModel();
+//        }
     }
 
     protected void setFilterObject(PartOfSpeech filterObject) {
@@ -115,7 +114,7 @@ public class UnitsListFrame extends AbstractListFrame<Sense, PartOfSpeech> {
 
         UnitsListFrame frame = new UnitsListFrame(workbench, x, y);
         frame.setFilterObject(filterObject);
-        frame.setMultSelect(multiSelect);
+        frame.setMultiSelect(multiSelect);
         frame.execute(filterObject);
         unitWasCreated.setValue(frame.unitWasCreated);
         return frame.selectedElements;

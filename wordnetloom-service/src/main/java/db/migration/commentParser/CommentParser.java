@@ -19,6 +19,7 @@ public class CommentParser {
         int startMarker = 0;
         String marker;
         currentIndex = 0;
+        secondIndex = 0;
         text = text.replace("\n", " ");
         ParserResult parserResult;
         while((currentIndex = getNext(text, currentIndex)) != -1) {
@@ -163,8 +164,12 @@ public class CommentParser {
         if(secondIndex == -1){
             secondIndex = text.length();
         }
-        if(text.charAt(startIndex) == ' '){
-            startIndex++;
+        try {
+            if (text.charAt(startIndex) == ' ') {
+                startIndex++;
+            }
+        } catch (Exception ex){
+            System.out.println(text);
         }
         return text.substring(startIndex, secondIndex);
     }

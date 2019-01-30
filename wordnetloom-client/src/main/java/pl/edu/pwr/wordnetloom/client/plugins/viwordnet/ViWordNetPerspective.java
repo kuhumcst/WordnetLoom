@@ -5,10 +5,9 @@ import pl.edu.pwr.wordnetloom.client.plugins.viwordnet.listeners.MouseGraphClick
 import pl.edu.pwr.wordnetloom.client.plugins.viwordnet.listeners.TabChangeListener;
 import pl.edu.pwr.wordnetloom.client.plugins.viwordnet.views.ViwnGraphView;
 import pl.edu.pwr.wordnetloom.client.systems.listeners.CloseableTabbedPaneListener;
-import pl.edu.pwr.wordnetloom.client.systems.ui.CloseableTabbedPane;
+import pl.edu.pwr.wordnetloom.client.systems.ui.GraphTabbedPane;
 import pl.edu.pwr.wordnetloom.client.systems.ui.MSplitPane;
 import pl.edu.pwr.wordnetloom.client.workbench.abstracts.AbstractPerspective;
-import pl.edu.pwr.wordnetloom.client.workbench.implementation.ServiceManager;
 import pl.edu.pwr.wordnetloom.client.workbench.implementation.ShortCut;
 import pl.edu.pwr.wordnetloom.client.workbench.interfaces.Loggable;
 import pl.edu.pwr.wordnetloom.client.workbench.interfaces.View;
@@ -28,21 +27,19 @@ import java.beans.PropertyChangeListener;
 public class ViWordNetPerspective extends AbstractPerspective implements
         CloseableTabbedPaneListener, PropertyChangeListener, Loggable {
 
-    private ViWordNetService service = null;
-
     public static final int SPLIT_LEFT_VIEW = 0;
     public static final int SPLIT_MAIN_VIEW = 1;
     public static final int SPILT_LOCKER_VIEW = 4;
     public static final int SPLIT_RIGHT_TOP_VIEW = 2;
     public static final int SPLIT_RIGHT_BOTTOM_VIEW = 3;
     public static final int SPLIT_RIGHT_CENTRAL_VIEW = 5;
-
     WebTabbedPane leftView;
-    WebTabbedPane graphView;
+    GraphTabbedPane graphView;
     WebTabbedPane rightTopView;
     WebTabbedPane rightBottomView;
     WebTabbedPane rightCentralView;
     WebTabbedPane locker;
+    private ViWordNetService service = null;
 
     /**
      * @param name
@@ -68,7 +65,7 @@ public class ViWordNetPerspective extends AbstractPerspective implements
         // panel.
         // Create top and bottom tabbed panel
         leftView = createPane();
-        graphView = new CloseableTabbedPane(true, true);
+        graphView = new GraphTabbedPane(true, true);
         rightTopView = createPane();
         rightBottomView = createPane();
         rightCentralView = createPane();
@@ -76,7 +73,7 @@ public class ViWordNetPerspective extends AbstractPerspective implements
         locker = createPane();
 
         // events connected with tabs
-        ((CloseableTabbedPane) graphView).addCloseableTabbedPaneListener(this);
+         graphView.addCloseableTabbedPaneListener(this);
 //        graphView.addChangeListener(new TabChangeListener(service));
 
         // Create central and bottom views
@@ -107,6 +104,7 @@ public class ViWordNetPerspective extends AbstractPerspective implements
 
         MSplitPane splitSearch = new MSplitPane(
                 JSplitPane.HORIZONTAL_SPLIT, leftView, splitMainVertical);
+
         splitSearch.setStartDividerLocation(210);
         splitSearch.setResizeWeight(0.0f);
 
@@ -137,11 +135,11 @@ public class ViWordNetPerspective extends AbstractPerspective implements
             switch (pos) {
                 case SPLIT_MAIN_VIEW:
                     if (service != null) {
-                        graphView.addTab(view.getTitle(), view.getPanel());
+                        graphView.addTab(view);
                         ((ViwnGraphView) view).getUI().getVisualizationViewer()
                                 .addMouseListener(new MouseGraphClickListener(service));
                     } else {
-                        graphView.addTab(view.getTitle(), view.getPanel());
+                        graphView.addTab(view);
                         ((ViwnGraphView) view).getUI().getVisualizationViewer()
                                 .addMouseListener(new MouseGraphClickListener(service));
                         // TODO: check the line below, why shortcuts does not work?

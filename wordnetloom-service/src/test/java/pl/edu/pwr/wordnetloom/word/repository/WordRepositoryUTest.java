@@ -10,6 +10,7 @@ import pl.edu.pwr.wordnetloom.commontests.utils.TestBaseRepository;
 import static pl.edu.pwr.wordnetloom.commontests.word.WordForTestsRepository.*;
 import pl.edu.pwr.wordnetloom.word.model.Word;
 
+@Ignore
 public class WordRepositoryUTest extends TestBaseRepository {
 
     private WordRepository wordRepository;
@@ -66,5 +67,6 @@ public class WordRepositoryUTest extends TestBaseRepository {
 
         assertThat(w, is(equalTo(krowa)));
     }
+
 
 }

@@ -7,15 +7,15 @@ import pl.edu.pwr.wordnetloom.relationtype.model.RelationType;
 
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class RelationTypeManager implements Loggable{
-
-    private List<RelationType> relationTypes;
+public class RelationTypeManager implements Loggable {
 
     private static RelationTypeManager instance;
+    private List<RelationType> relationTypes;
 
     private RelationTypeManager() {
         relationTypes = new ArrayList<>();
@@ -28,14 +28,14 @@ public class RelationTypeManager implements Loggable{
         return instance;
     }
 
-    public void load(final List<RelationType> relationTypes) {
+    public void load(List<RelationType> relationTypes) {
 
         this.relationTypes.clear();
         this.relationTypes.addAll(relationTypes);
 
     }
 
-    public RelationType get(final Long id, final RelationArgument relationArgument) {
+    public RelationType get(Long id, RelationArgument relationArgument) {
         return relationTypes
                 .stream()
                 .filter(r -> relationArgument.equals(r.getRelationArgument()))
@@ -44,7 +44,7 @@ public class RelationTypeManager implements Loggable{
                 .orElse(null);
     }
 
-    public RelationType get(final Long id, final RelationArgument relationArgument, final Lexicon lexicon) {
+    public RelationType get(Long id, RelationArgument relationArgument, Lexicon lexicon) {
         return relationTypes
                 .stream()
                 .filter(r -> relationArgument.equals(r.getRelationArgument()))
@@ -54,7 +54,7 @@ public class RelationTypeManager implements Loggable{
                 .orElse(null);
     }
 
-    public RelationType get(final Long id) {
+    public RelationType get(Long id) {
         return relationTypes
                 .stream()
                 .filter(r -> id.equals(r.getId()))
@@ -62,15 +62,26 @@ public class RelationTypeManager implements Loggable{
                 .orElse(null);
     }
 
-    public List<RelationType> getParents(final RelationArgument relationArgument) {
+    public List<RelationType> getParents(RelationArgument relationArgument) {
         return relationTypes
                 .stream()
                 .filter(r -> relationArgument.equals(r.getRelationArgument()))
                 .filter(r -> r.getParent() == null)
+                .sorted(Comparator.comparingInt(RelationType::getOrder))
                 .collect(Collectors.toList());
     }
 
-    public List<RelationType> getRelationsWithoutProxyParent(final RelationArgument relationArgument) {
+    public List<RelationType> getMultilingualParents(RelationArgument relationArgument) {
+        return relationTypes
+                .stream()
+                .filter(r -> relationArgument.equals(r.getRelationArgument()))
+                .filter(r -> r.getParent() == null)
+                .filter(RelationType::getMultilingual)
+                .sorted(Comparator.comparingInt(RelationType::getOrder))
+                .collect(Collectors.toList());
+    }
+
+    public List<RelationType> getRelationsWithoutProxyParent(RelationArgument relationArgument) {
         return relationTypes
                 .stream()
                 .filter(r -> relationArgument.equals(r.getRelationArgument()))
@@ -78,7 +89,7 @@ public class RelationTypeManager implements Loggable{
                 .collect(Collectors.toList());
     }
 
-    public List<RelationType> getRelationsWithoutProxyParent(final RelationArgument relationArgument, final Lexicon lexicon) {
+    public List<RelationType> getRelationsWithoutProxyParent(RelationArgument relationArgument, Lexicon lexicon) {
         return relationTypes
                 .stream()
                 .filter(r -> relationArgument.equals(r.getRelationArgument()))
@@ -94,7 +105,7 @@ public class RelationTypeManager implements Loggable{
                 .findAny().orElse(null) != null;
     }
 
-    public List<RelationType> getChildren(final Long parentId, final RelationArgument relationArgument) {
+    public List<RelationType> getChildren(Long parentId, RelationArgument relationArgument) {
         return relationTypes
                 .stream()
                 .filter(r -> r.getParent() != null)
@@ -107,6 +118,7 @@ public class RelationTypeManager implements Loggable{
         return relationTypes
                 .stream()
                 .filter(r -> r.getParent() != null && parentId.equals(r.getParent().getId()))
+                .sorted(Comparator.comparingLong(RelationType::getOrder))
                 .collect(Collectors.toList());
     }
 
@@ -116,11 +128,11 @@ public class RelationTypeManager implements Loggable{
         return LocalisationManager.getInstance().getLocalisedString(relationType.getName());
     }
 
-    public HashMap<Long, Color> getRelationsColors(){
+    public HashMap<Long, Color> getRelationsColors() {
 
         HashMap<Long, Color> relationColors = new HashMap<>();
 
-        relationTypes.forEach( rt -> {
+        relationTypes.forEach(rt -> {
             Color c;
             try {
                 c = Color.decode(rt.getColor());
